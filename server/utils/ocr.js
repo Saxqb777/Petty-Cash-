@@ -1,10 +1,23 @@
 const Tesseract = require('tesseract.js');
+const pdfParse = require('pdf-parse');
+const fs = require('fs');
+const path = require('path');
 
-async function extractTextFromImage(imagePath) {
-  const { data: { text } } = await Tesseract.recognize(imagePath, 'eng+ara', {
+async function extractTextFromFile(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+
+  if (ext === '.pdf') {
+    const buffer = fs.readFileSync(filePath);
+    const data = await pdfParse(buffer);
+    return data.text || '';
+  }
+
+  // For images: use Tesseract OCR
+  const { data: { text } } = await Tesseract.recognize(filePath, 'eng+ara', {
     logger: () => {}
   });
   return text || '';
 }
 
-module.exports = { extractTextFromImage };
+// Keep old export name for compatibility
+module.exports = { extractTextFromImage: extractTextFromFile, extractTextFromFile };
