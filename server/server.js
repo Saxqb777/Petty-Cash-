@@ -3,6 +3,15 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
+// Prevent Tesseract worker crashes from killing the whole server
+process.on('uncaughtException', (err) => {
+  if (err.message && err.message.includes('Error attempting to read image')) {
+    console.warn('[OCR] Could not read image — skipping OCR for this file');
+  } else {
+    console.error('[Uncaught]', err.message);
+  }
+});
+
 const recordsRouter = require('./routes/records');
 const uploadRouter = require('./routes/upload');
 const exportRouter = require('./routes/export');
