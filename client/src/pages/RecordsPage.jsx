@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Search, Download, Trash2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
-  FileText, Filter, X, Edit2, CheckCircle, AlertCircle, Plus
+  FileText, Filter, X, Edit2, CheckCircle, AlertCircle, Plus, Ship, Fuel, Receipt
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
@@ -13,6 +13,12 @@ const CATEGORIES = [
 ];
 
 const BUS = ['AAFB', 'Al Foah', 'GMFF', 'BMB', 'Other'];
+
+const EXPENSE_TYPE_META = {
+  adnoc: { label: 'ADNOC / Fuel', icon: Fuel, color: 'bg-orange-100 text-orange-700' },
+  shipping: { label: 'Shipping Bill', icon: Ship, color: 'bg-blue-100 text-blue-700' },
+  general: { label: 'General', icon: Receipt, color: 'bg-gray-100 text-gray-600' },
+};
 
 const fmt = (n) => new Intl.NumberFormat('en-AE', { minimumFractionDigits: 2 }).format(n || 0);
 const fmtDate = (d) => {
@@ -200,6 +206,7 @@ export default function RecordsPage() {
   const [filterBU, setFilterBU] = useState('');
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
+  const [filterType, setFilterType] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
   const [expanded, setExpanded] = useState(null);
@@ -212,13 +219,13 @@ export default function RecordsPage() {
     try {
       const data = await api.getRecords({
         search, category: filterCat, business_unit: filterBU,
-        from: filterFrom, to: filterTo, page, limit: 20
+        from: filterFrom, to: filterTo, expense_type: filterType, page, limit: 20
       });
       setRecords(data.records); setTotal(data.total);
       setPage(data.page); setPages(data.pages);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
-  }, [search, filterCat, filterBU, filterFrom, filterTo, page]);
+  }, [search, filterCat, filterBU, filterFrom, filterTo, filterType, page]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -234,8 +241,8 @@ export default function RecordsPage() {
     finally { setDeleting(null); }
   };
 
-  const clearFilters = () => { setSearch(''); setFilterCat(''); setFilterBU(''); setFilterFrom(''); setFilterTo(''); setPage(1); };
-  const hasFilters = search || filterCat || filterBU || filterFrom || filterTo;
+  const clearFilters = () => { setSearch(''); setFilterCat(''); setFilterBU(''); setFilterFrom(''); setFilterTo(''); setFilterType(''); setPage(1); };
+  const hasFilters = search || filterCat || filterBU || filterFrom || filterTo || filterType;
   const totalAmt = records.reduce((s, r) => s + r.amount, 0);
 
   return (
@@ -289,7 +296,16 @@ export default function RecordsPage() {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 pt-3 border-t border-gray-100 fade-in">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3 pt-3 border-t border-gray-100 fade-in">
+            <div>
+              <label className="label">Type</label>
+              <select className="input" value={filterType} onChange={e => { setFilterType(e.target.value); setPage(1); }}>
+                <option value="">All Types</option>
+                <option value="adnoc">ADNOC / Fuel</option>
+                <option value="shipping">Shipping Bill</option>
+                <option value="general">General</option>
+              </select>
+            </div>
             <div>
               <label className="label">Category</label>
               <select className="input" value={filterCat} onChange={e => { setFilterCat(e.target.value); setPage(1); }}>
@@ -360,8 +376,17 @@ export default function RecordsPage() {
                         <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtDate(r.date)}</td>
                         <td className="px-4 py-3 text-sm text-gray-500 font-mono text-xs">{r.invoice_number || '—'}</td>
                         <td className="px-4 py-3">
-                          <p className="text-sm font-semibold text-gray-800">{r.vendor_name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold text-gray-800">{r.vendor_name}</p>
+                            {r.expense_type && r.expense_type !== 'general' && (() => {
+                              const meta = EXPENSE_TYPE_META[r.expense_type];
+                              if (!meta) return null;
+                              const Icon = meta.icon;
+                              return <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md font-medium ${meta.color}`}><Icon className="w-3 h-3" />{meta.label}</span>;
+                            })()}
+                          </div>
                           {r.purpose && <p className="text-xs text-gray-400 truncate max-w-xs">{r.purpose}</p>}
+                          {r.expense_type === 'shipping' && r.bl_number && <p className="text-xs text-blue-500 font-mono mt-0.5">BL: {r.bl_number}</p>}
                         </td>
                         <td className="px-4 py-3">
                           <span className={`badge text-xs ${CATEGORY_COLORS[r.category] || 'badge-gray'}`}>
@@ -411,12 +436,76 @@ export default function RecordsPage() {
                                   <p className="text-gray-700">{v}</p>
                                 </div>
                               ))}
+
+                              {/* Shipping-specific fields */}
+                              {r.expense_type === 'shipping' && (
+                                <>
+                                  {r.bl_number && <div>
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">BL Number</p>
+                                    <p className="text-gray-700 font-mono">{r.bl_number}</p>
+                                  </div>}
+                                  {r.container_number && <div>
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Container</p>
+                                    <p className="text-gray-700 font-mono">{r.container_number}</p>
+                                  </div>}
+                                  {r.port && <div>
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Port</p>
+                                    <p className="text-gray-700">{r.port}</p>
+                                  </div>}
+                                  {r.shipment_type && <div>
+                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Shipment</p>
+                                    <p className="text-gray-700">{r.shipment_type}</p>
+                                  </div>}
+                                </>
+                              )}
+
+                              {/* Charge breakdown for shipping */}
+                              {r.expense_type === 'shipping' && r.line_items && r.line_items.length > 0 && (
+                                <div className="col-span-2 md:col-span-4">
+                                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Charge Breakdown</p>
+                                  <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                                    <table className="w-full text-sm">
+                                      <thead>
+                                        <tr className="bg-blue-50 border-b border-blue-100">
+                                          <th className="text-left px-4 py-2 text-xs font-semibold text-blue-700">Charge</th>
+                                          <th className="text-right px-4 py-2 text-xs font-semibold text-blue-700">Amount (AED)</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-50">
+                                        {r.line_items.map((item, i) => (
+                                          <tr key={i}>
+                                            <td className="px-4 py-2 text-gray-700">{item.name || item.label || item.description}</td>
+                                            <td className="px-4 py-2 text-right text-gray-900 font-medium">{fmt(item.amount)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                      <tfoot>
+                                        <tr className="bg-blue-50 border-t border-blue-100">
+                                          <td className="px-4 py-2 text-xs font-bold text-blue-700">TOTAL</td>
+                                          <td className="px-4 py-2 text-right text-sm font-bold text-blue-700">
+                                            {fmt(r.line_items.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0))}
+                                          </td>
+                                        </tr>
+                                      </tfoot>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
+
                               {r.image_path && (
                                 <div className="col-span-2 md:col-span-4">
-                                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Bill Image</p>
-                                  <a href={r.image_path} target="_blank" rel="noopener noreferrer">
-                                    <img src={r.image_path} alt="Bill" className="h-28 rounded-lg object-contain border border-gray-200 hover:opacity-80 transition-opacity" />
-                                  </a>
+                                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Bill</p>
+                                  {r.image_path.toLowerCase().endsWith('.pdf') ? (
+                                    <a href={r.image_path} target="_blank" rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-blue-600 hover:bg-blue-50 transition-colors">
+                                      <FileText className="w-4 h-4" />
+                                      View PDF
+                                    </a>
+                                  ) : (
+                                    <a href={r.image_path} target="_blank" rel="noopener noreferrer">
+                                      <img src={r.image_path} alt="Bill" className="h-28 rounded-lg object-contain border border-gray-200 hover:opacity-80 transition-opacity" />
+                                    </a>
+                                  )}
                                 </div>
                               )}
                             </div>
