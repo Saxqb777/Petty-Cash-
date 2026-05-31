@@ -1,9 +1,8 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs');
 const path = require('path');
-const { extractPdfText, isPdf } = require('./ocr');
 
-const MIME_MAP = {
+const IMAGE_MIME = {
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
   '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp'
 };
@@ -27,25 +26,25 @@ function buildPrompt(today) {
 
 Context:
 - UAE food & logistics company. Business units: AAFB, Al Foah, GMFF, BMB
-- Common expenses: ADNOC fuel (100–200 AED), parking (10–60 AED), photocopy (10–100 AED)
+- Common expenses: ADNOC fuel (100–200 AED), parking (10–60 AED), photocopy/printing (10–100 AED)
 - Currency is almost always AED. Receipts may contain Arabic text.
-- Dates appear as DD/MM/YYYY or DD.MM.YYYY — convert to YYYY-MM-DD
+- Dates appear as DD/MM/YYYY or DD.MM.YYYY — convert all dates to YYYY-MM-DD format
 - Today: ${today}
 
-Return ONLY a valid JSON object, no markdown, no explanation:
+Extract all fields you can read from this receipt/document. Return ONLY a valid JSON object, no markdown, no explanation:
 {
-  "invoice_number": "receipt number or null",
-  "vendor_name": "vendor name (e.g. ADNOC, Carrefour, Dubai Parking)",
+  "invoice_number": "receipt/invoice number visible on the bill, or null",
+  "vendor_name": "name of vendor/shop/station (e.g. ADNOC, Carrefour, Dubai Municipality Parking)",
   "amount": 0.00,
   "currency": "AED",
   "date": "YYYY-MM-DD",
   "category": "one of: ${CATEGORIES.join(' | ')}",
-  "business_unit": "one of: ${BUSINESS_UNITS.join(' | ')} or null",
+  "business_unit": "one of: ${BUSINESS_UNITS.join(' | ')} or null if not clear",
   "payment_method": "Cash or Card",
   "purpose": "brief description of what this expense was for",
-  "submitted_by": "person name if visible or null",
+  "submitted_by": "person name if visible, else null",
   "line_items": [],
-  "notes": "any other useful info or null"
+  "notes": "any other useful info from the receipt, or null"
 }`;
 }
 
@@ -60,43 +59,37 @@ async function parseReceiptFile(filePath, originalName = '') {
   const client = getClient();
   const today = new Date().toISOString().split('T')[0];
   const prompt = buildPrompt(today);
+  const ext = path.extname(filePath).toLowerCase();
+  const fileData = fs.readFileSync(filePath).toString('base64');
 
-  let response;
+  let contentBlocks;
 
-  if (isPdf(filePath)) {
-    // PDF: extract text first, then ask Claude to parse it
-    let pdfText = '';
-    try { pdfText = await extractPdfText(filePath); } catch (e) { /* silent */ }
-
-    response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      messages: [{
-        role: 'user',
-        content: `${prompt}\n\nText extracted from the PDF receipt:\n"""\n${pdfText || '[No text could be extracted]'}\n"""\n\nFilename: ${originalName}`
-      }]
-    });
+  if (ext === '.pdf') {
+    // Send PDF directly to Claude — it reads scanned PDFs natively
+    contentBlocks = [
+      {
+        type: 'document',
+        source: { type: 'base64', media_type: 'application/pdf', data: fileData }
+      },
+      { type: 'text', text: prompt }
+    ];
   } else {
-    // Image: send directly to Claude Vision — much more accurate than OCR
-    const ext = path.extname(filePath).toLowerCase();
-    const mediaType = MIME_MAP[ext] || 'image/jpeg';
-    const imageData = fs.readFileSync(filePath).toString('base64');
-
-    response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: imageData }
-          },
-          { type: 'text', text: prompt }
-        ]
-      }]
-    });
+    // Send image directly to Claude Vision
+    const mediaType = IMAGE_MIME[ext] || 'image/jpeg';
+    contentBlocks = [
+      {
+        type: 'image',
+        source: { type: 'base64', media_type: mediaType, data: fileData }
+      },
+      { type: 'text', text: prompt }
+    ];
   }
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1024,
+    messages: [{ role: 'user', content: contentBlocks }]
+  });
 
   return cleanJson(response.content[0].text);
 }

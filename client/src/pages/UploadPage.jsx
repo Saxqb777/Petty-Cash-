@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, FileImage, X, CheckCircle, AlertCircle, ChevronDown, PenLine, Scan } from 'lucide-react';
+import { Upload, FileText, X, CheckCircle, AlertCircle, ChevronDown, PenLine, Scan } from 'lucide-react';
 import { api } from '../utils/api';
 
 const CATEGORIES = [
@@ -45,7 +45,8 @@ export default function UploadPage() {
   const [tab, setTab] = useState('upload'); // 'upload' | 'manual'
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [preview, setPreview] = useState(null);
+  const [preview, setPreview] = useState(null); // null | 'pdf' | objectURL
+  const [fileName, setFileName] = useState('');
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -59,7 +60,9 @@ export default function UploadPage() {
     if (!file) return;
     setError('');
     setUploading(true);
-    setPreview(URL.createObjectURL(file));
+    setFileName(file.name);
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+    setPreview(isPdf ? 'pdf' : URL.createObjectURL(file));
     try {
       const result = await api.uploadBill(file);
       const p = result.parsed || {};
@@ -109,7 +112,7 @@ export default function UploadPage() {
   };
 
   const reset = () => {
-    setForm(EMPTY_FORM); setPreview(null); setStage('idle'); setSaved(false); setError('');
+    setForm(EMPTY_FORM); setPreview(null); setFileName(''); setStage('idle'); setSaved(false); setError('');
   };
 
   const FormBody = () => (
@@ -220,7 +223,17 @@ export default function UploadPage() {
             ) : (
               <div className="card overflow-hidden">
                 <div className="relative">
-                  <img src={preview} alt="Bill preview" className="w-full object-contain max-h-80" />
+                  {preview === 'pdf' ? (
+                    <div className="flex flex-col items-center justify-center py-10 px-6 bg-gray-50">
+                      <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mb-3">
+                        <FileText className="w-7 h-7 text-red-500" />
+                      </div>
+                      <p className="text-sm font-semibold text-gray-700 text-center truncate max-w-full">{fileName}</p>
+                      <p className="text-xs text-gray-400 mt-1">PDF — Claude will read it directly</p>
+                    </div>
+                  ) : (
+                    <img src={preview} alt="Bill preview" className="w-full object-contain max-h-80" />
+                  )}
                   <button onClick={reset} className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full shadow flex items-center justify-center hover:bg-red-50">
                     <X className="w-4 h-4 text-gray-500" />
                   </button>
