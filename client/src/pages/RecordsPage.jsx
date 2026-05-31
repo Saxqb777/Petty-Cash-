@@ -15,7 +15,7 @@ const CATEGORIES = [
 const BUS = ['AAFB', 'Al Foah', 'GMFF', 'BMB', 'Other'];
 
 const EXPENSE_TYPE_META = {
-  adnoc: { label: 'ADNOC / Fuel', icon: Fuel, color: 'bg-orange-100 text-orange-700' },
+  adnoc: { label: 'Petrol & Fuel', icon: Fuel, color: 'bg-orange-100 text-orange-700' },
   shipping: { label: 'Shipping Bill', icon: Ship, color: 'bg-blue-100 text-blue-700' },
   general: { label: 'General', icon: Receipt, color: 'bg-gray-100 text-gray-600' },
 };
@@ -301,7 +301,7 @@ export default function RecordsPage() {
               <label className="label">Type</label>
               <select className="input" value={filterType} onChange={e => { setFilterType(e.target.value); setPage(1); }}>
                 <option value="">All Types</option>
-                <option value="adnoc">ADNOC / Fuel</option>
+                <option value="adnoc">Petrol & Fuel</option>
                 <option value="shipping">Shipping Bill</option>
                 <option value="general">General</option>
               </select>

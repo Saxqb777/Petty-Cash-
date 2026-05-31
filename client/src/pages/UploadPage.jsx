@@ -264,6 +264,8 @@ export default function UploadPage() {
   const [error, setError] = useState('');
   const [stage, setStage] = useState('idle');
 
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   const [adnocForm, setAdnocForm] = useState(EMPTY_ADNOC);
   const [shippingForm, setShippingForm] = useState(EMPTY_SHIPPING);
   const [shippingCharges, setShippingCharges] = useState(
@@ -272,6 +274,7 @@ export default function UploadPage() {
   const [generalForm, setGeneralForm] = useState(EMPTY_GENERAL);
 
   const fileRef = useRef();
+  const progressRef = useRef(null);
 
   const setField = (type, k, v) => {
     if (type === 'adnoc') setAdnocForm(f => ({ ...f, [k]: v }));
@@ -285,7 +288,17 @@ export default function UploadPage() {
     if (!file) return;
     setError('');
     setUploading(true);
+    setUploadProgress(2);
     setFileName(file.name);
+
+    clearInterval(progressRef.current);
+    progressRef.current = setInterval(() => {
+      setUploadProgress(p => {
+        if (p >= 88) return 88;
+        const step = p < 40 ? 7 : p < 65 ? 4 : p < 80 ? 2 : 0.6;
+        return Math.min(88, p + step);
+      });
+    }, 180);
     setPreview(file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : URL.createObjectURL(file));
 
     try {
@@ -357,7 +370,9 @@ export default function UploadPage() {
       setError(`Upload failed: ${e.message}`);
       setPreview(null);
     } finally {
-      setUploading(false);
+      clearInterval(progressRef.current);
+      setUploadProgress(100);
+      setTimeout(() => { setUploadProgress(0); setUploading(false); }, 500);
     }
   }, [expenseType]);
 
@@ -415,7 +430,7 @@ export default function UploadPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* ADNOC */}
+          {/* Fuel / Petrol */}
           <button
             onClick={() => setExpenseType('adnoc')}
             className="group card p-6 text-left hover:shadow-card-hover hover:border-orange-200 transition-all duration-200"
@@ -423,8 +438,8 @@ export default function UploadPage() {
             <div className="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-orange-200 transition-colors">
               <Fuel className="w-6 h-6 text-orange-600" />
             </div>
-            <h3 className="font-bold text-gray-900 mb-1">ADNOC / Fuel</h3>
-            <p className="text-xs text-gray-500 leading-relaxed">Fuel receipts, vehicle expenses. Quick entry with invoice #, amount, date.</p>
+            <h3 className="font-bold text-gray-900 mb-1">Petrol & Fuel</h3>
+            <p className="text-xs text-gray-500 leading-relaxed">Fuel station receipts, vehicle expenses. Quick entry with invoice #, amount, date.</p>
           </button>
 
           {/* Shipping */}
@@ -457,7 +472,7 @@ export default function UploadPage() {
 
   // ── Form Screen ────────────────────────────────────────────────────────────
   const typeConfig = {
-    adnoc:    { label: 'ADNOC / Fuel', icon: Fuel, color: 'text-orange-600', bg: 'bg-orange-100' },
+    adnoc:    { label: 'Petrol & Fuel', icon: Fuel, color: 'text-orange-600', bg: 'bg-orange-100' },
     shipping: { label: 'Shipping Line Bill', icon: Ship, color: 'text-blue-600', bg: 'bg-blue-100' },
     general:  { label: 'General Expense', icon: LayoutGrid, color: 'text-brand-600', bg: 'bg-brand-100' }
   };
@@ -523,7 +538,7 @@ export default function UploadPage() {
                   }
                 </div>
                 <p className="text-sm font-semibold text-gray-700 mb-1">
-                  {uploading ? 'Reading bill with AI...' : 'Drop your bill here'}
+                  {uploading ? 'Scanning document...' : 'Drop your bill here'}
                 </p>
                 <p className="text-xs text-gray-400 text-center">or click to browse · JPG, PNG, PDF up to 15MB</p>
                 <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden"
@@ -538,19 +553,39 @@ export default function UploadPage() {
                         <FileText className="w-6 h-6 text-red-500" />
                       </div>
                       <p className="text-sm font-medium text-gray-700 truncate max-w-xs px-4 text-center">{fileName}</p>
-                      <p className="text-xs text-gray-400 mt-1">PDF read by Claude directly</p>
+                      <p className="text-xs text-gray-400 mt-1">{uploading ? 'Reading document...' : 'Document uploaded'}</p>
                     </div>
                   ) : (
                     <img src={preview} alt="Bill" className="w-full object-contain max-h-72" />
                   )}
-                  <button onClick={() => { setPreview(null); setStage('idle'); }}
-                    className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full shadow flex items-center justify-center hover:bg-red-50">
-                    <X className="w-4 h-4 text-gray-500" />
-                  </button>
+                  {!uploading && (
+                    <button onClick={() => { setPreview(null); setStage('idle'); }}
+                      className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full shadow flex items-center justify-center hover:bg-red-50">
+                      <X className="w-4 h-4 text-gray-500" />
+                    </button>
+                  )}
+                  {/* Loading bar */}
+                  {uploading && (
+                    <div className="absolute bottom-0 left-0 right-0">
+                      <div className="h-1 bg-gray-200">
+                        <div
+                          className="h-full bg-brand-500 transition-all duration-300 ease-out"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {stage === 'extracted' && (
+                {uploading && (
+                  <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex items-center gap-3">
+                    <div className="w-3.5 h-3.5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    <span className="text-xs text-gray-500 font-medium">Extracting details from your bill...</span>
+                    <span className="ml-auto text-xs text-gray-400">{Math.round(uploadProgress)}%</span>
+                  </div>
+                )}
+                {stage === 'extracted' && !uploading && (
                   <div className="p-3 bg-brand-50 border-t border-brand-100 flex items-center gap-2 text-xs text-brand-700 font-medium">
-                    <CheckCircle className="w-3.5 h-3.5" /> AI extracted — review below
+                    <CheckCircle className="w-3.5 h-3.5" /> Details extracted — review and save
                   </div>
                 )}
               </div>
