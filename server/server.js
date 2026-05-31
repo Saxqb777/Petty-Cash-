@@ -1,0 +1,25 @@
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+
+const recordsRouter = require('./routes/records');
+const uploadRouter = require('./routes/upload');
+const exportRouter = require('./routes/export');
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+app.use(cors());
+app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+app.use('/api/records', recordsRouter);
+app.use('/api/upload', uploadRouter);
+app.use('/api/export', exportRouter);
+
+app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
+
+app.listen(PORT, () => {
+  console.log(`Agthia Petty Cash server running on http://localhost:${PORT}`);
+});
