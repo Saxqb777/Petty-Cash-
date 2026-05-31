@@ -1,6 +1,10 @@
 const Anthropic = require('@anthropic-ai/sdk');
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function getClient() {
+  const key = (process.env.ANTHROPIC_API_KEY || '').trim();
+  if (!key) throw new Error('ANTHROPIC_API_KEY is missing from your .env file');
+  return new Anthropic({ apiKey: key });
+}
 
 const CATEGORIES = [
   'Fuel & Transport',
@@ -53,8 +57,9 @@ Return ONLY a valid JSON object with NO markdown formatting, NO code blocks, NO 
   "notes": "any other relevant extracted info, else null"
 }`;
 
+  const client = getClient();
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }]
   });

@@ -29,7 +29,12 @@ const upload = multer({
   }
 });
 
-router.post('/', upload.single('bill'), async (req, res) => {
+router.post('/', (req, res, next) => {
+  upload.single('bill')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
