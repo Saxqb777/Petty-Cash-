@@ -29,4 +29,12 @@ db.exec(`
   )
 `);
 
+// Safe migrations — add new columns without breaking existing data
+const migrate = (sql) => { try { db.exec(sql); } catch (_) {} };
+migrate(`ALTER TABLE expenses ADD COLUMN expense_type TEXT DEFAULT 'general'`);
+migrate(`ALTER TABLE expenses ADD COLUMN bl_number TEXT`);
+migrate(`ALTER TABLE expenses ADD COLUMN container_number TEXT`);
+migrate(`ALTER TABLE expenses ADD COLUMN port TEXT`);
+migrate(`ALTER TABLE expenses ADD COLUMN shipment_type TEXT`);
+
 module.exports = db;
