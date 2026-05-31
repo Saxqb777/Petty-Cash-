@@ -41,10 +41,10 @@ Extract all fields you can read from this receipt/document. Return ONLY a valid 
   "category": "one of: ${CATEGORIES.join(' | ')}",
   "business_unit": "one of: ${BUSINESS_UNITS.join(' | ')} or null if not clear",
   "payment_method": "Cash or Card",
-  "purpose": "brief description of what this expense was for",
-  "submitted_by": "person name if visible, else null",
+  "purpose": "3-5 words max, e.g. 'Vehicle fuel' or 'Parking fee'",
+  "submitted_by": "person name if visible on receipt, else null",
   "line_items": [],
-  "notes": "any other useful info from the receipt, or null"
+  "notes": null
 }`;
 }
 
