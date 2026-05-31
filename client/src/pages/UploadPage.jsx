@@ -289,7 +289,7 @@ export default function UploadPage() {
     setPreview(file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : URL.createObjectURL(file));
 
     try {
-      const result = await api.uploadBill(file);
+      const result = await api.uploadBill(file, expenseType);
       const p = result.parsed || {};
 
       if (expenseType === 'adnoc') {
@@ -306,10 +306,38 @@ export default function UploadPage() {
           ...f,
           vendor_name: p.vendor_name || f.vendor_name,
           invoice_number: p.invoice_number || f.invoice_number,
+          bl_number: p.bl_number || f.bl_number,
+          container_number: p.container_number || f.container_number,
+          port: p.port || f.port,
+          shipment_type: p.shipment_type || f.shipment_type,
           date: p.date || f.date,
           submitted_by: p.submitted_by || f.submitted_by,
           image_path: result.image_path || ''
         }));
+
+        // Map extracted line_items back to charge fields
+        if (Array.isArray(p.line_items) && p.line_items.length > 0) {
+          const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          // Fill standard charges from extracted data
+          setShippingCharges(current =>
+            current.map(c => {
+              const match = p.line_items.find(li => normalize(li.name) === normalize(c.label));
+              return match ? { ...c, amount: match.amount > 0 ? match.amount.toString() : '' } : c;
+            })
+          );
+          // Add any extra charges from the bill that aren't in the standard list
+          const standardNorm = SHIPPING_CHARGES.map(normalize);
+          const extras = p.line_items.filter(li => {
+            const n = normalize(li.name);
+            return !standardNorm.includes(n) && parseFloat(li.amount) > 0;
+          });
+          if (extras.length > 0) {
+            setShippingCharges(c => [
+              ...c,
+              ...extras.map(e => ({ label: e.name, amount: e.amount.toString(), custom: true }))
+            ]);
+          }
+        }
       } else {
         setGeneralForm(f => ({
           ...f,

@@ -45,9 +45,10 @@ router.post('/', (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
+    const expenseType = req.body.expense_type || 'general';
     let parsed = { ...FALLBACK };
     try {
-      parsed = await parseReceiptFile(req.file.path, req.file.originalname);
+      parsed = await parseReceiptFile(req.file.path, req.file.originalname, expenseType);
     } catch (err) {
       console.warn('Claude parse failed:', err.message);
     }

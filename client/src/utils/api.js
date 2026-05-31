@@ -25,9 +25,10 @@ export const api = {
   getDashboard: () => request('/records/stats/dashboard'),
 
   // Upload
-  uploadBill: (file) => {
+  uploadBill: (file, expenseType = 'general') => {
     const fd = new FormData();
     fd.append('bill', file);
+    fd.append('expense_type', expenseType);
     return fetch(`${BASE}/upload`, { method: 'POST', body: fd }).then(r => {
       if (!r.ok) return r.json().then(e => { throw new Error(e.error); });
       return r.json();
