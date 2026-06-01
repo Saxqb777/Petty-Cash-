@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingDown, Plus, Trash2, RefreshCw, Upload, X, ChevronDown } from 'lucide-react';
+import { TrendingDown, Plus, Trash2, RefreshCw, Upload, X, ChevronDown, Link2 } from 'lucide-react';
 import { api } from '../utils/api';
 
 const fmt = (n) => new Intl.NumberFormat('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
@@ -171,12 +171,45 @@ export default function SavingsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState(false);
+  const [shippingExpenses, setShippingExpenses] = useState([]);
+  const [linkedExpense, setLinkedExpense] = useState('');
 
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const computedSavings = form.old_fee && form.new_fee
+  const computedSavings = form.old_fee !== '' && form.new_fee !== ''
     ? (parseFloat(form.old_fee) || 0) - (parseFloat(form.new_fee) || 0)
     : null;
+
+  // Load shipping expenses for linking
+  useEffect(() => {
+    api.getRecords({ expense_type: 'shipping', limit: 200 })
+      .then(d => setShippingExpenses(d.records || []))
+      .catch(() => {});
+  }, []);
+
+  const handleLinkExpense = (id) => {
+    setLinkedExpense(id);
+    if (!id) return;
+    const exp = shippingExpenses.find(e => String(e.id) === String(id));
+    if (!exp) return;
+    // Extract agent fee from line_items
+    const agentFeeItem = (exp.line_items || []).find(li =>
+      li.label?.toLowerCase().includes('agent') ||
+      li.name?.toLowerCase().includes('agent')
+    );
+    const agentFee = agentFeeItem ? parseFloat(agentFeeItem.amount) || 0 : 0;
+    const bls = exp.bl_numbers?.length ? exp.bl_numbers : exp.bl_number ? [exp.bl_number] : [];
+    setForm(f => ({
+      ...f,
+      date:           exp.date          || f.date,
+      business_unit:  exp.business_unit || f.business_unit,
+      port:           exp.port          || f.port,
+      import_export:  exp.shipment_type || f.import_export,
+      current_agent:  exp.vendor_name   || f.current_agent,
+      reference_number: bls.join(', ') || exp.invoice_number || f.reference_number,
+      new_fee:        agentFee > 0 ? String(agentFee) : f.new_fee,
+    }));
+  };
 
   const loadSummary = async () => {
     try {
@@ -229,6 +262,7 @@ export default function SavingsPage() {
       });
       setFormSuccess(true);
       setForm(EMPTY_FORM);
+      setLinkedExpense('');
       setTimeout(() => setFormSuccess(false), 2500);
       await Promise.all([loadSummary(), loadRecords()]);
       setTab('records');
@@ -423,6 +457,43 @@ export default function SavingsPage() {
             {formError && <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">{formError}</div>}
             {formSuccess && <div className="mb-4 p-3 bg-brand-50 border border-brand-100 rounded-xl text-sm text-brand-700">Record saved successfully.</div>}
 
+            {/* Link to existing shipping expense */}
+            {shippingExpenses.length > 0 && (
+              <div className="mb-5 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-2">
+                  <Link2 className="w-4 h-4 text-brand-500" />
+                  Auto-fill from a recorded shipping bill (optional)
+                </label>
+                <div className="relative">
+                  <select
+                    value={linkedExpense}
+                    onChange={e => handleLinkExpense(e.target.value)}
+                    className="input appearance-none pr-8 cursor-pointer text-sm"
+                  >
+                    <option value="">— Pick a shipping expense to auto-fill —</option>
+                    {shippingExpenses.map(e => {
+                      const agentFeeItem = (e.line_items || []).find(li =>
+                        li.label?.toLowerCase().includes('agent') || li.name?.toLowerCase().includes('agent')
+                      );
+                      const agentFee = agentFeeItem ? parseFloat(agentFeeItem.amount) : 0;
+                      const bl = e.bl_numbers?.[0] || e.bl_number || '';
+                      return (
+                        <option key={e.id} value={e.id}>
+                          {e.date} · {e.vendor_name}{bl ? ` · BL: ${bl}` : ''}{agentFee > 0 ? ` · Agent Fee: AED ${agentFee}` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                </div>
+                {linkedExpense && (
+                  <p className="text-xs text-brand-600 mt-1.5 font-medium">
+                    ✓ Date, port, BU, current agent and new fee filled from the selected bill. Only enter the old agent fee below.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="label">Date *</label>
@@ -485,7 +556,7 @@ export default function SavingsPage() {
             </div>
 
             <div className="flex gap-3 mt-6 pt-4 border-t border-slate-100">
-              <button onClick={() => { setTab('records'); setForm(EMPTY_FORM); setFormError(''); }} className="btn-secondary">
+              <button onClick={() => { setTab('records'); setForm(EMPTY_FORM); setFormError(''); setLinkedExpense(''); }} className="btn-secondary">
                 Cancel
               </button>
               <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2">
