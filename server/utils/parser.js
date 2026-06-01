@@ -16,7 +16,9 @@ const CATEGORIES = [
 function getClient() {
   const key = (process.env.ANTHROPIC_API_KEY || '').trim();
   if (!key) throw new Error('ANTHROPIC_API_KEY is missing from your .env file');
-  return new Anthropic({ apiKey: key });
+  // The SDK retries 429 / 500 / 529 automatically with exponential backoff.
+  // timeout is per-attempt; a slow multi-page PDF gets up to 90s before a retry.
+  return new Anthropic({ apiKey: key, maxRetries: 4, timeout: 90_000 });
 }
 
 function buildPrompt(today) {
@@ -81,34 +83,36 @@ If consignee/notify party contains "Al Foah", "AAFB", "GMFF", "BMB", or "Agthia"
 ━━━ STEP 5 — CHARGES ━━━
 Read EVERY charge line on the bill. Amounts in AED (convert USD × 3.6725 if needed).
 
-Now output ONLY this JSON (no explanation, no markdown):
-"vendor_name": "shipping line or agent full name",
-"invoice_number": "invoice/debit note/reference number",
-"bl_numbers": ["all", "bl", "numbers"],
-"bl_number": "first bl number or null",
-"container_numbers": ["ALL", "container", "numbers", "found"],
-"container_number": "first container number or null",
-"port": "AUH or DXB or SHJ or AJM or port name",
-"shipment_type": "Import or Export",
-"date": "YYYY-MM-DD",
-"business_unit": "AAFB or Al Foah or GMFF or BMB or null",
-"submitted_by": "person name or null",
-"line_items": [
-  { "name": "Ocean Freight", "amount": 0 },
-  { "name": "THC (Terminal Handling)", "amount": 0 },
-  { "name": "Demurrage", "amount": 0 },
-  { "name": "Detention", "amount": 0 },
-  { "name": "Documentation Fee", "amount": 0 },
-  { "name": "BOE / Customs Clearance", "amount": 0 },
-  { "name": "MOIAT Fee", "amount": 0 },
-  { "name": "Agent Fee", "amount": 0 },
-  { "name": "Customs Duty", "amount": 0 },
-  { "name": "Inspection Fee", "amount": 0 },
-  { "name": "Transport / Delivery", "amount": 0 },
-  { "name": "Port Charges", "amount": 0 },
-  { "name": "Local Charges", "amount": 0 }
-]
-CHARGE RULES: match every line on bill to standard names above; add extras as { "name": "exact name", "amount": 123 }; 0 only if charge is absent; all amounts as plain AED numbers.`;
+Now output ONLY this JSON object (no explanation, no markdown — start with { and end with }):
+{
+  "vendor_name": "shipping line or agent full name",
+  "invoice_number": "invoice/debit note/reference number",
+  "bl_numbers": ["all", "bl", "numbers"],
+  "bl_number": "first bl number or null",
+  "container_numbers": ["ALL", "container", "numbers", "found"],
+  "container_number": "first container number or null",
+  "port": "AUH or DXB or SHJ or AJM or port name",
+  "shipment_type": "Import or Export",
+  "date": "YYYY-MM-DD",
+  "business_unit": "AAFB or Al Foah or GMFF or BMB or null",
+  "submitted_by": "person name or null",
+  "line_items": [
+    { "name": "Ocean Freight", "amount": 0 },
+    { "name": "THC (Terminal Handling)", "amount": 0 },
+    { "name": "Demurrage", "amount": 0 },
+    { "name": "Detention", "amount": 0 },
+    { "name": "Documentation Fee", "amount": 0 },
+    { "name": "BOE / Customs Clearance", "amount": 0 },
+    { "name": "MOIAT Fee", "amount": 0 },
+    { "name": "Agent Fee", "amount": 0 },
+    { "name": "Customs Duty", "amount": 0 },
+    { "name": "Inspection Fee", "amount": 0 },
+    { "name": "Transport / Delivery", "amount": 0 },
+    { "name": "Port Charges", "amount": 0 },
+    { "name": "Local Charges", "amount": 0 }
+  ]
+}
+CHARGE RULES: match every line on the bill to a standard name above; add any extra charge as { "name": "exact name on bill", "amount": 123 }; use 0 only when a charge is genuinely absent; all amounts as plain AED numbers (no currency symbols or commas).`;
 }
 
 function buildAdnocPrompt(today) {
@@ -169,34 +173,29 @@ async function parseReceiptFile(filePath, originalName = '', expenseType = 'gene
   else if (expenseType === 'adnoc') prompt = buildAdnocPrompt(today);
   else prompt = buildPrompt(today);
 
-  let contentBlocks;
-  if (ext === '.pdf') {
-    contentBlocks = [
-      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fileData } },
-      { type: 'text', text: prompt }
-    ];
-  } else {
-    const mediaType = IMAGE_MIME[ext] || 'image/jpeg';
-    contentBlocks = [
-      { type: 'image', source: { type: 'base64', media_type: mediaType, data: fileData } },
-      { type: 'text', text: prompt }
-    ];
-  }
+  // Put the bill (volatile, changes every request) in the user turn, and the
+  // large static instructions in the system prompt so they form a cacheable
+  // prefix. cache_control is harmless if the prefix is below the model's
+  // minimum cacheable size — it just won't cache.
+  const media = ext === '.pdf'
+    ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fileData } }
+    : { type: 'image', source: { type: 'base64', media_type: IMAGE_MIME[ext] || 'image/jpeg', data: fileData } };
 
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Claude API timed out after 60s')), 60000)
-  );
-  const response = await Promise.race([
-    client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      system: 'You are a data extraction assistant. Always respond with valid JSON only — no explanation, no markdown, no prose before or after.',
-      messages: [{ role: 'user', content: contentBlocks }]
-    }),
-    timeout
-  ]);
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 8192,
+    temperature: 0, // deterministic extraction — same bill yields the same fields
+    system: [{ type: 'text', text: prompt, cache_control: { type: 'ephemeral' } }],
+    messages: [{
+      role: 'user',
+      content: [
+        media,
+        { type: 'text', text: 'Extract the data from this document and respond with the JSON object only — no prose, no markdown fences.' }
+      ]
+    }]
+  });
 
-  const rawText = response.content[0].text;
+  const rawText = response.content.find(b => b.type === 'text')?.text || '';
   const parsed = cleanJson(rawText);
 
   // Normalize port to known codes
