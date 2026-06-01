@@ -141,6 +141,7 @@ function cleanJson(raw) {
   let text = raw.trim();
   const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/s);
   if (fence) text = fence[1].trim();
+  // Always slice to first { ... last } to strip any surrounding prose
   const firstBrace = text.indexOf('{');
   const lastBrace = text.lastIndexOf('}');
   if (firstBrace !== -1 && lastBrace !== -1) text = text.slice(firstBrace, lastBrace + 1);
@@ -185,14 +186,11 @@ async function parseReceiptFile(filePath, originalName = '', expenseType = 'gene
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 4096,
-    messages: [
-      { role: 'user', content: contentBlocks },
-      { role: 'assistant', content: '{' }
-    ]
+    system: 'You are a data extraction assistant. Always respond with valid JSON only — no explanation, no markdown, no prose before or after.',
+    messages: [{ role: 'user', content: contentBlocks }]
   });
 
-  const raw = '{' + response.content[0].text;
-  const parsed = cleanJson(raw);
+  const parsed = cleanJson(response.content[0].text);
 
   // Normalize port to known codes
   if (parsed.port) parsed.port = normalizePort(parsed.port);
