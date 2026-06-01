@@ -51,69 +51,64 @@ Return ONLY valid JSON (no markdown fences, no explanation):
 }
 
 function buildShippingPrompt(today) {
-  return `You are an expert UAE freight & customs accountant for Agthia Group. Extract EVERY detail from this shipping document with maximum accuracy — like a human expert reading it carefully.
+  return `You are an expert UAE freight & customs accountant for Agthia Group. Read every word, number, and table cell in this shipping document.
 
-DOCUMENT TYPE: Could be a shipping line bill, freight invoice, clearance bill, debit note, or combined charges statement from companies like MSC, Maersk, CMA CGM, Hapag-Lloyd, Emirates Shipping Line, COSCO, Evergreen, or local UAE freight/clearance agents (Al Gharbeya, Gulftainer, ADPC agents, etc.)
+DOCUMENT TYPE: Shipping line bill, freight invoice, clearance statement, or debit/credit note from carriers like MSC, Maersk, CMA CGM, Hapag-Lloyd, Emirates Shipping, COSCO, Evergreen, or UAE agents (Al Gharbeya, Gulftainer, etc.)
 
-CONSIGNEE CONTEXT:
-- The importer/consignee is Agthia Group or one of its subsidiaries
-- If you see "Al Foah", "AAFB", "GMFF", "BMB", or "Agthia" in the consignee/notify party → set business_unit
-- Today: ${today}
+TODAY: ${today}
 
-PORT NORMALIZATION — read port of loading, port of discharge, place of delivery:
-- Abu Dhabi / Khalifa Port / KIZAD / ADCP / Musaffah / Mina Zayed → "AUH"
-- Jebel Ali / DP World / JAFZA / Dubai Port / Dubai → "DXB"
-- Sharjah / Sharjah Port / Khorfakkan → "SHJ"
-- Ajman / Ajman Port → "AJM"
-- For any other port use the actual port name
+━━━ STEP 1 — SCAN FOR CONTAINER NUMBERS ━━━
+Container numbers follow this EXACT pattern: 4 uppercase letters + 7 digits (e.g. MSCU1234567, TRIU8617408, CAIU9876543, HLXU1234560, MRKU0000001).
+- They appear in tables, lists, or inline — scan EVERY row, EVERY column, EVERY page
+- A bill for 5 containers has 5 container numbers — find ALL of them
+- Common prefixes: MSCU, TRIU, TCKU, CAIU, HLXU, MRKU, CRXU, FSCU, GESU, NYKU, TLLU, UACU
+- Put EVERY container number you find into "container_numbers" array — missing even one is an error
 
-CURRENCY: All amounts in AED. If you see USD values, multiply by 3.6725. Return all amounts as AED numbers.
+━━━ STEP 2 — SCAN FOR BL NUMBERS ━━━
+BL / Bill of Lading numbers appear near labels like "B/L No.", "BL No.", "Bill of Lading", "House BL".
+- Extract ALL BL numbers into "bl_numbers" array
 
-DATE: Convert any date format to YYYY-MM-DD (handle DD/MM/YYYY, DD.MM.YYYY, DD-MMM-YYYY, etc.)
+━━━ STEP 3 — PORT (normalize to code) ━━━
+- Abu Dhabi / Khalifa Port / KIZAD / Musaffah / Mina Zayed / ADCP → "AUH"
+- Jebel Ali / DP World / JAFZA / Dubai → "DXB"
+- Sharjah / Khorfakkan → "SHJ"
+- Ajman → "AJM"
+- Use port of DISCHARGE (destination), not loading
 
-CRITICAL — EXTRACT ALL BL AND CONTAINER NUMBERS:
-- Many bills cover MULTIPLE containers — scan the ENTIRE document for all container numbers
-- Container numbers: letters + numbers (e.g. MSCU1234567, TCKU9876543, CAIU1234560, HLXU8765432)
-- BL numbers: alphanumeric strings in BL/B.O.L/House BL fields (e.g. MSCUAE123456, HLCUAUH123456789)
-- If the bill lists containers in a table, extract every single one
-- Put ALL container numbers in container_numbers array, ALL BL numbers in bl_numbers array
+━━━ STEP 4 — BUSINESS UNIT ━━━
+If consignee/notify party contains "Al Foah", "AAFB", "GMFF", "BMB", or "Agthia" → set business_unit
 
-Return ONLY a valid JSON object — no markdown, no code fences, no extra text:
-{
-  "vendor_name": "full name of the shipping line or freight agent as printed on the bill",
-  "invoice_number": "invoice number, credit note number, or reference number from the bill",
-  "bl_numbers": ["MSCUAE123456", "MSCUAE654321"],
-  "bl_number": "first BL number (or null)",
-  "container_numbers": ["MSCU1234567", "TCKU9876543", "CAIU0000000"],
-  "container_number": "first container number (or null)",
-  "port": "AUH or DXB or SHJ or AJM or actual port name",
-  "shipment_type": "Import or Export",
-  "date": "YYYY-MM-DD",
-  "business_unit": "AAFB or Al Foah or GMFF or BMB or null",
-  "submitted_by": "person name if shown, else null",
-  "line_items": [
-    { "name": "Ocean Freight", "amount": 0 },
-    { "name": "THC (Terminal Handling)", "amount": 0 },
-    { "name": "Demurrage", "amount": 0 },
-    { "name": "Detention", "amount": 0 },
-    { "name": "Documentation Fee", "amount": 0 },
-    { "name": "BOE / Customs Clearance", "amount": 0 },
-    { "name": "MOIAT Fee", "amount": 0 },
-    { "name": "Agent Fee", "amount": 0 },
-    { "name": "Customs Duty", "amount": 0 },
-    { "name": "Inspection Fee", "amount": 0 },
-    { "name": "Transport / Delivery", "amount": 0 },
-    { "name": "Port Charges", "amount": 0 },
-    { "name": "Local Charges", "amount": 0 }
-  ]
-}
+━━━ STEP 5 — CHARGES ━━━
+Read EVERY charge line on the bill. Amounts in AED (convert USD × 3.6725 if needed).
 
-RULES FOR line_items:
-- Go through EVERY charge row on the bill — miss nothing
-- Map each charge to the closest standard name above and set its amount
-- Any charge not matching a standard name → ADD as extra: { "name": "exact charge name from bill", "amount": 123.45 }
-- Only leave amount as 0 for charges genuinely absent from this bill
-- All amounts must be plain numbers (no commas, no currency symbols), in AED`;
+Now output ONLY this JSON (no explanation, no markdown):
+"vendor_name": "shipping line or agent full name",
+"invoice_number": "invoice/debit note/reference number",
+"bl_numbers": ["all", "bl", "numbers"],
+"bl_number": "first bl number or null",
+"container_numbers": ["ALL", "container", "numbers", "found"],
+"container_number": "first container number or null",
+"port": "AUH or DXB or SHJ or AJM or port name",
+"shipment_type": "Import or Export",
+"date": "YYYY-MM-DD",
+"business_unit": "AAFB or Al Foah or GMFF or BMB or null",
+"submitted_by": "person name or null",
+"line_items": [
+  { "name": "Ocean Freight", "amount": 0 },
+  { "name": "THC (Terminal Handling)", "amount": 0 },
+  { "name": "Demurrage", "amount": 0 },
+  { "name": "Detention", "amount": 0 },
+  { "name": "Documentation Fee", "amount": 0 },
+  { "name": "BOE / Customs Clearance", "amount": 0 },
+  { "name": "MOIAT Fee", "amount": 0 },
+  { "name": "Agent Fee", "amount": 0 },
+  { "name": "Customs Duty", "amount": 0 },
+  { "name": "Inspection Fee", "amount": 0 },
+  { "name": "Transport / Delivery", "amount": 0 },
+  { "name": "Port Charges", "amount": 0 },
+  { "name": "Local Charges", "amount": 0 }
+]
+CHARGE RULES: match every line on bill to standard names above; add extras as { "name": "exact name", "amount": 123 }; 0 only if charge is absent; all amounts as plain AED numbers.`;
 }
 
 function buildAdnocPrompt(today) {
@@ -210,6 +205,11 @@ async function parseReceiptFile(filePath, originalName = '', expenseType = 'gene
     if (!Array.isArray(parsed.container_numbers)) {
       parsed.container_numbers = parsed.container_number ? [parsed.container_number] : [];
     }
+    // Also regex-scan the raw response for any container numbers the model put in text but missed in the array
+    const containerPattern = /\b([A-Z]{4}\d{7})\b/g;
+    const foundInText = [...raw.matchAll(containerPattern)].map(m => m[1]);
+    parsed.container_numbers = [...new Set([...parsed.container_numbers, ...foundInText].filter(Boolean))];
+
     // Deduplicate
     parsed.bl_numbers = [...new Set(parsed.bl_numbers.filter(Boolean))];
     parsed.container_numbers = [...new Set(parsed.container_numbers.filter(Boolean))];
