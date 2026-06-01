@@ -33,6 +33,13 @@ app.use('/api/savings', savingsRouter);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
-app.listen(PORT, () => {
+// Serve built React frontend in production
+const clientDist = path.join(__dirname, '../client/dist');
+if (require('fs').existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get('*', (req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+}
+
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Agthia Petty Cash server running on http://localhost:${PORT}`);
 });
