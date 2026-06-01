@@ -21,6 +21,7 @@ const CustomTooltip = ({ active, payload }) => {
 };
 
 const CenterLabel = ({ viewBox, total }) => {
+  if (!viewBox) return null;
   const { cx, cy } = viewBox;
   const formatted = total >= 1000
     ? `${(total / 1000).toFixed(1)}k`
