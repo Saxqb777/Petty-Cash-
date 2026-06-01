@@ -386,7 +386,17 @@ export default function RecordsPage() {
                             })()}
                           </div>
                           {r.purpose && <p className="text-xs text-gray-400 truncate max-w-xs">{r.purpose}</p>}
-                          {r.expense_type === 'shipping' && r.bl_number && <p className="text-xs text-blue-500 font-mono mt-0.5">BL: {r.bl_number}</p>}
+                          {r.expense_type === 'shipping' && (() => {
+                            const bls = r.bl_numbers?.length ? r.bl_numbers : r.bl_number ? [r.bl_number] : [];
+                            if (!bls.length) return null;
+                            return (
+                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                {bls.map(bl => (
+                                  <span key={bl} className="text-[10px] font-mono bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">{bl}</span>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3">
                           <span className={`badge text-xs ${CATEGORY_COLORS[r.category] || 'badge-gray'}`}>
@@ -438,26 +448,38 @@ export default function RecordsPage() {
                               ))}
 
                               {/* Shipping-specific fields */}
-                              {r.expense_type === 'shipping' && (
-                                <>
-                                  {r.bl_number && <div>
-                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">BL Number</p>
-                                    <p className="text-gray-700 font-mono">{r.bl_number}</p>
-                                  </div>}
-                                  {r.container_number && <div>
-                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Container</p>
-                                    <p className="text-gray-700 font-mono">{r.container_number}</p>
-                                  </div>}
-                                  {r.port && <div>
-                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Port</p>
-                                    <p className="text-gray-700">{r.port}</p>
-                                  </div>}
-                                  {r.shipment_type && <div>
-                                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Shipment</p>
-                                    <p className="text-gray-700">{r.shipment_type}</p>
-                                  </div>}
-                                </>
-                              )}
+                              {r.expense_type === 'shipping' && (() => {
+                                const bls   = r.bl_numbers?.length   ? r.bl_numbers   : r.bl_number   ? [r.bl_number]   : [];
+                                const conts = r.container_numbers?.length ? r.container_numbers : r.container_number ? [r.container_number] : [];
+                                return (
+                                  <>
+                                    {bls.length > 0 && (
+                                      <div className="col-span-2">
+                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">BL Numbers ({bls.length})</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {bls.map(bl => <span key={bl} className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md border border-blue-100">{bl}</span>)}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {conts.length > 0 && (
+                                      <div className="col-span-2">
+                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Containers ({conts.length})</p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {conts.map(c => <span key={c} className="text-xs font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">{c}</span>)}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {r.port && <div>
+                                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Port</p>
+                                      <p className="text-gray-700">{r.port}</p>
+                                    </div>}
+                                    {r.shipment_type && <div>
+                                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Shipment</p>
+                                      <p className="text-gray-700">{r.shipment_type}</p>
+                                    </div>}
+                                  </>
+                                );
+                              })()}
 
                               {/* Charge breakdown for shipping */}
                               {r.expense_type === 'shipping' && r.line_items && r.line_items.length > 0 && (
