@@ -526,12 +526,25 @@ export default function UploadPage() {
       const p = result.parsed || {};
 
       if (expenseType === 'adnoc') {
+        // Build auto notes from extra ADNOC fields
+        const adnocExtra = [
+          p.vehicle_plate && `Plate: ${p.vehicle_plate}`,
+          p.fuel_type && `Fuel: ${p.fuel_type}`,
+          p.litres && parseFloat(p.litres) > 0 && `${p.litres}L`,
+          p.odometer && `Odometer: ${p.odometer}`,
+        ].filter(Boolean).join(' | ');
+
         setAdnocForm(f => ({
           ...f,
           invoice_number: p.invoice_number || f.invoice_number,
           amount: p.amount?.toString() || f.amount,
+          currency: p.currency || f.currency,
           date: p.date || f.date,
+          business_unit: p.business_unit || f.business_unit,
+          payment_method: p.payment_method || f.payment_method,
+          purpose: p.purpose || f.purpose,
           submitted_by: p.submitted_by || f.submitted_by,
+          notes: adnocExtra || f.notes,
           image_path: result.image_path || ''
         }));
       } else if (expenseType === 'shipping') {
@@ -544,6 +557,7 @@ export default function UploadPage() {
           port: p.port || f.port,
           shipment_type: p.shipment_type || f.shipment_type,
           date: p.date || f.date,
+          business_unit: p.business_unit || f.business_unit,
           submitted_by: p.submitted_by || f.submitted_by,
           image_path: result.image_path || ''
         }));
