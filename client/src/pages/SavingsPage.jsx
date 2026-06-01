@@ -347,17 +347,6 @@ export default function SavingsPage() {
   useEffect(() => { loadSummary(); }, []);
   useEffect(() => { loadRecords(); }, [page, filterBU, filterIE, filterFrom, filterTo]);
 
-  const handleDelete = async (id) => {
-    try {
-      await api.deleteSaving(id);
-      toast.success('Savings record deleted');
-      await Promise.all([loadSummary(), loadRecords()]);
-    } catch (e) {
-      toast.error(e.message);
-    } finally {
-      setConfirmDelete(null);
-    }
-  };
 
   const handleSave = async () => {
     if (!form.date || !form.old_fee) { setFormError('Date and old fee are required.'); return; }
@@ -377,6 +366,18 @@ export default function SavingsPage() {
       setFormError(e.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await api.deleteSaving(id);
+      toast.success('Savings record deleted');
+      await Promise.all([loadSummary(), loadRecords()]);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setConfirmDelete(null);
     }
   };
 

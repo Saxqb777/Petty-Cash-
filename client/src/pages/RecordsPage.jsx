@@ -622,8 +622,8 @@ export default function RecordsPage() {
         )}
       </div>
 
-      {showExport    && <ExportModal onClose={() => setShowExport(false)} />}
-      {editRecord    && <EditModal record={editRecord} onClose={() => setEditRecord(null)} onSave={load} />}
+      {showExport && <ExportModal onClose={() => setShowExport(false)} />}
+      {editRecord && <EditModal record={editRecord} onClose={() => setEditRecord(null)} onSave={load} />}
 
       <ConfirmDialog
         open={confirmDelete !== null}

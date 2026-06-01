@@ -63,15 +63,7 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests, please slow down.' },
 });
 
-// Tighter limit on uploads (Claude API costs money)
-const uploadLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 min
-  max: 20,
-  message: { error: 'Too many uploads, please wait a moment.' },
-});
-
 app.use('/api', apiLimiter);
-app.use('/api/upload', uploadLimiter);
 
 // ── Static files ──────────────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
