@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Table2, Settings, TrendingUp, PiggyBank } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Table2, Settings, Leaf, PiggyBank } from 'lucide-react';
 
 const nav = [
   { to: '/',        icon: LayoutDashboard, label: 'Dashboard' },
@@ -15,15 +15,15 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="px-5 pt-6 pb-5 border-b border-white/[0.06]">
         <div className="flex items-center gap-3">
-          <div className="relative w-10 h-10">
-            <div className="absolute inset-0 bg-brand-500 rounded-xl opacity-20 blur-sm" />
-            <div className="relative w-10 h-10 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center shadow-glow-sm">
-              <TrendingUp className="w-5 h-5 text-white" />
+          <div className="relative w-11 h-11">
+            <div className="absolute inset-0 bg-brand-500 rounded-full opacity-25 blur-md" />
+            <div className="relative w-11 h-11 bg-gradient-to-br from-brand-400 to-brand-600 rounded-full flex items-center justify-center shadow-glow-sm ring-1 ring-white/10">
+              <Leaf className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
             </div>
           </div>
-          <div>
-            <p className="text-white font-bold text-[15px] leading-tight font-heading tracking-tight">Agthia</p>
-            <p className="text-brand-400 text-[11px] font-medium tracking-widest uppercase">Petty Cash</p>
+          <div className="leading-none">
+            <p className="text-white font-bold text-[19px] font-heading tracking-tight lowercase">agthia</p>
+            <p className="text-brand-400 text-[10px] font-semibold tracking-[0.2em] uppercase mt-1">Petty Cash</p>
           </div>
         </div>
       </div>
@@ -65,7 +65,7 @@ export default function Sidebar() {
       <div className="px-5 py-4 border-t border-white/[0.06] space-y-1">
         <p className="text-white/20 text-[11px]">© 2026 Agthia Group</p>
         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-brand-500/10 border border-brand-500/20 rounded text-brand-400 text-[10px] font-mono font-medium">
-          v1.5.0
+          v1.6.0
         </span>
       </div>
     </aside>

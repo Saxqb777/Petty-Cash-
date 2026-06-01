@@ -45,7 +45,7 @@ export default function RecentTransactions({ transactions = [] }) {
       {transactions.map((tx, i) => {
         const Icon       = CATEGORY_ICONS[tx.category] || MoreHorizontal;
         const colorClass = CATEGORY_COLORS[tx.category] || 'bg-slate-100 text-slate-500';
-        const amount     = new Intl.NumberFormat('en-AE', { minimumFractionDigits: 2 }).format(tx.amount);
+        const amount     = new Intl.NumberFormat('en-AE', { minimumFractionDigits: 2 }).format(tx.amount_aed || tx.amount);
         return (
           <div
             key={tx.id}

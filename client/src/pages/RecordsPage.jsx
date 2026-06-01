@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Fragment } from 'react';
 import {
   Search, Download, Trash2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   FileText, Filter, X, Edit2, AlertCircle, Plus, Ship, Fuel, Receipt, ArrowUpDown
@@ -19,7 +19,7 @@ const BUS = ['AAFB', 'Al Foah', 'GMFF', 'BMB', 'Other'];
 const EXPENSE_TYPE_META = {
   adnoc:    { label: 'Petrol & Fuel',  icon: Fuel,    color: 'bg-orange-100 text-orange-700' },
   shipping: { label: 'Shipping Bill',  icon: Ship,    color: 'bg-blue-100 text-blue-700' },
-  general:  { label: 'General',        icon: Receipt, color: 'bg-gray-100 text-gray-600' },
+  general:  { label: 'General',        icon: Receipt, color: 'bg-slate-100 text-slate-600' },
 };
 
 const fmt = (n) => new Intl.NumberFormat('en-AE', { minimumFractionDigits: 2 }).format(n || 0);
@@ -38,7 +38,7 @@ const CATEGORY_COLORS = {
   'Office Supplies':        'bg-indigo-100 text-indigo-700',
   'Accommodation & Travel': 'bg-sky-100 text-sky-700',
   'Medical':                'bg-red-100 text-red-700',
-  'Miscellaneous':          'bg-gray-100 text-gray-600'
+  'Miscellaneous':          'bg-slate-100 text-slate-600'
 };
 
 // ─── Export Modal ─────────────────────────────────────────────────────────────
@@ -65,8 +65,8 @@ function ExportModal({ onClose }) {
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-slide-up">
         <div className="flex items-center justify-between mb-5">
-          <h3 className="font-bold text-gray-900">Export to Excel</h3>
-          <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center">
+          <h3 className="font-bold text-slate-900">Export to Excel</h3>
+          <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -76,7 +76,7 @@ function ExportModal({ onClose }) {
             <div className="grid grid-cols-3 gap-2">
               {['all', 'this_month', 'custom'].map(t => (
                 <button key={t} onClick={() => setType(t)}
-                  className={`py-2 rounded-lg text-sm font-medium border transition-all ${type === t ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-200 text-gray-600 hover:border-brand-300'}`}>
+                  className={`py-2 rounded-lg text-sm font-medium border transition-all ${type === t ? 'bg-brand-600 text-white border-brand-600' : 'border-slate-200 text-slate-600 hover:border-brand-300'}`}>
                   {t === 'all' ? 'All Time' : t === 'this_month' ? 'This Month' : 'Custom'}
                 </button>
               ))}
@@ -145,8 +145,8 @@ function EditModal({ record, onClose, onSave }) {
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 animate-slide-up">
         <div className="flex items-center justify-between mb-5">
-          <h3 className="font-bold text-gray-900">Edit Expense</h3>
-          <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center"><X className="w-4 h-4" /></button>
+          <h3 className="font-bold text-slate-900">Edit Expense</h3>
+          <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center"><X className="w-4 h-4" /></button>
         </div>
         <div className="grid grid-cols-2 gap-4">
           {[
@@ -215,8 +215,8 @@ function SortTh({ label, field, sortBy, sortDir, onSort, className = '' }) {
   return (
     <th
       onClick={() => field && onSort(field)}
-      className={`text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap select-none
-        ${field ? 'cursor-pointer hover:text-gray-700 hover:bg-gray-100 transition-colors' : ''} ${className}`}
+      className={`text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap select-none
+        ${field ? 'cursor-pointer hover:text-slate-700 hover:bg-slate-100 transition-colors' : ''} ${className}`}
     >
       <span className="inline-flex items-center gap-1">
         {label}
@@ -309,8 +309,8 @@ export default function RecordsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Records</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{total} expense{total !== 1 ? 's' : ''} · AED {fmt(totalAmt)} shown</p>
+          <h1 className="text-2xl font-heading font-bold text-slate-900 tracking-tight">Records</h1>
+          <p className="text-sm text-slate-400 mt-0.5 font-medium">{total} expense{total !== 1 ? 's' : ''} · AED {fmt(totalAmt)} shown</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowExport(true)} className="btn-secondary flex items-center gap-2 text-sm">
@@ -326,7 +326,7 @@ export default function RecordsPage() {
       <div className="card p-4 mb-4">
         <div className="flex gap-3 items-center">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               className="input pl-9"
               placeholder="Search vendor, purpose, invoice..."
@@ -341,14 +341,14 @@ export default function RecordsPage() {
             <Filter className="w-4 h-4" /> Filters {hasFilters && <span className="w-2 h-2 bg-brand-500 rounded-full" />}
           </button>
           {hasFilters && (
-            <button onClick={clearFilters} className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1">
+            <button onClick={clearFilters} className="text-sm text-slate-400 hover:text-slate-600 flex items-center gap-1">
               <X className="w-3.5 h-3.5" /> Clear
             </button>
           )}
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3 pt-3 border-t border-gray-100 animate-fade-in">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3 pt-3 border-t border-slate-100 animate-fade-in">
             <div>
               <label className="label">Type</label>
               <select className="input" value={filterType} onChange={e => { setFilterType(e.target.value); setPage(1); }}>
@@ -393,15 +393,15 @@ export default function RecordsPage() {
       {/* Table */}
       <div className="card overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-400 text-sm">
+          <div className="p-8 text-center text-slate-400 text-sm">
             <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
             Loading records...
           </div>
         ) : records.length === 0 ? (
           <div className="p-12 text-center">
-            <FileText className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">{hasFilters ? 'No records match your filters' : 'No records found'}</p>
-            <p className="text-sm text-gray-400 mt-1">
+            <FileText className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium">{hasFilters ? 'No records match your filters' : 'No records found'}</p>
+            <p className="text-sm text-slate-400 mt-1">
               {hasFilters ? 'Try clearing some filters to see more results' : 'Add a new expense to get started'}
             </p>
             {hasFilters
@@ -414,7 +414,7 @@ export default function RecordsPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
+                  <tr className="bg-slate-50 border-b border-slate-100">
                     <SortTh label="Date"         field="date"          sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                     <SortTh label="Invoice"      field={null}          sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
                     <SortTh label="Vendor"       field="vendor_name"   sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
@@ -425,19 +425,18 @@ export default function RecordsPage() {
                     <th className="px-4 py-3 w-24" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-slate-50">
                   {records.map(r => (
-                    <>
+                    <Fragment key={r.id}>
                       <tr
-                        key={r.id}
                         onClick={() => setExpanded(expanded === r.id ? null : r.id)}
-                        className="hover:bg-gray-50/70 cursor-pointer transition-colors group"
+                        className="hover:bg-slate-50/70 cursor-pointer transition-colors group"
                       >
-                        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{fmtDate(r.date)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-500 font-mono text-xs">{r.invoice_number || '—'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">{fmtDate(r.date)}</td>
+                        <td className="px-4 py-3 text-sm text-slate-500 font-mono text-xs">{r.invoice_number || '—'}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-gray-800">{r.vendor_name}</p>
+                            <p className="text-sm font-semibold text-slate-800">{r.vendor_name}</p>
                             {r.expense_type && r.expense_type !== 'general' && (() => {
                               const meta = EXPENSE_TYPE_META[r.expense_type];
                               if (!meta) return null;
@@ -445,7 +444,7 @@ export default function RecordsPage() {
                               return <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-md font-medium ${meta.color}`}><Icon className="w-3 h-3" />{meta.label}</span>;
                             })()}
                           </div>
-                          {r.purpose && <p className="text-xs text-gray-400 truncate max-w-xs">{r.purpose}</p>}
+                          {r.purpose && <p className="text-xs text-slate-400 truncate max-w-xs">{r.purpose}</p>}
                           {r.expense_type === 'shipping' && (() => {
                             const bls = r.bl_numbers?.length ? r.bl_numbers : r.bl_number ? [r.bl_number] : [];
                             if (!bls.length) return null;
@@ -467,34 +466,37 @@ export default function RecordsPage() {
                           {r.business_unit && <span className="badge badge-green text-xs">{r.business_unit}</span>}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`text-xs font-medium ${r.payment_method === 'Card' ? 'text-blue-600' : 'text-gray-600'}`}>
+                          <span className={`text-xs font-medium ${r.payment_method === 'Card' ? 'text-blue-600' : 'text-slate-600'}`}>
                             {r.payment_method || 'Cash'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <span className="text-sm font-bold text-gray-900">{fmt(r.amount)}</span>
+                          <span className="text-sm font-bold text-slate-900">{fmt(r.amount_aed || r.amount)}</span>
+                          {r.currency && r.currency !== 'AED' && (
+                            <span className="block text-[10px] text-slate-400 font-medium">{r.currency} {fmt(r.amount)}</span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={e => { e.stopPropagation(); setEditRecord(r); }}
-                              className="w-7 h-7 rounded-lg hover:bg-brand-50 flex items-center justify-center text-gray-400 hover:text-brand-600">
+                              className="w-7 h-7 rounded-lg hover:bg-brand-50 flex items-center justify-center text-slate-400 hover:text-brand-600">
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={e => { e.stopPropagation(); setConfirmDelete(r.id); }}
                               disabled={deleting === r.id}
-                              className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center text-gray-400 hover:text-red-500"
+                              className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center text-slate-400 hover:text-red-500"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                            {expanded === r.id ? <ChevronUp className="w-3.5 h-3.5 text-gray-400" /> : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />}
+                            {expanded === r.id ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
                           </div>
                         </td>
                       </tr>
 
                       {/* Expanded Row */}
                       {expanded === r.id && (
-                        <tr key={`${r.id}-detail`} className="bg-brand-50/40">
+                        <tr className="bg-brand-50/40">
                           <td colSpan={8} className="px-6 py-4">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                               {[
@@ -504,8 +506,8 @@ export default function RecordsPage() {
                                 { l: 'Notes',        v: r.notes || '—' },
                               ].map(({ l, v }) => (
                                 <div key={l}>
-                                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">{l}</p>
-                                  <p className="text-gray-700">{v}</p>
+                                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{l}</p>
+                                  <p className="text-slate-700">{v}</p>
                                 </div>
                               ))}
 
@@ -517,7 +519,7 @@ export default function RecordsPage() {
                                   <>
                                     {bls.length > 0 && (
                                       <div className="col-span-2">
-                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">BL Numbers ({bls.length})</p>
+                                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">BL Numbers ({bls.length})</p>
                                         <div className="flex flex-wrap gap-1.5">
                                           {bls.map(bl => <span key={bl} className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md border border-blue-100">{bl}</span>)}
                                         </div>
@@ -525,19 +527,19 @@ export default function RecordsPage() {
                                     )}
                                     {conts.length > 0 && (
                                       <div className="col-span-2">
-                                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Containers ({conts.length})</p>
+                                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Containers ({conts.length})</p>
                                         <div className="flex flex-wrap gap-1.5">
                                           {conts.map(c => <span key={c} className="text-xs font-mono bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">{c}</span>)}
                                         </div>
                                       </div>
                                     )}
                                     {r.port && <div>
-                                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Port</p>
-                                      <p className="text-gray-700">{r.port}</p>
+                                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">Port</p>
+                                      <p className="text-slate-700">{r.port}</p>
                                     </div>}
                                     {r.shipment_type && <div>
-                                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Shipment</p>
-                                      <p className="text-gray-700">{r.shipment_type}</p>
+                                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">Shipment</p>
+                                      <p className="text-slate-700">{r.shipment_type}</p>
                                     </div>}
                                   </>
                                 );
@@ -546,8 +548,8 @@ export default function RecordsPage() {
                               {/* Charge breakdown for shipping */}
                               {r.expense_type === 'shipping' && r.line_items && r.line_items.length > 0 && (
                                 <div className="col-span-2 md:col-span-4">
-                                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Charge Breakdown</p>
-                                  <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Charge Breakdown</p>
+                                  <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
                                     <table className="w-full text-sm">
                                       <thead>
                                         <tr className="bg-blue-50 border-b border-blue-100">
@@ -555,11 +557,11 @@ export default function RecordsPage() {
                                           <th className="text-right px-4 py-2 text-xs font-semibold text-blue-700">Amount (AED)</th>
                                         </tr>
                                       </thead>
-                                      <tbody className="divide-y divide-gray-50">
+                                      <tbody className="divide-y divide-slate-50">
                                         {r.line_items.map((item, i) => (
                                           <tr key={i}>
-                                            <td className="px-4 py-2 text-gray-700">{item.name || item.label || item.description}</td>
-                                            <td className="px-4 py-2 text-right text-gray-900 font-medium">{fmt(item.amount)}</td>
+                                            <td className="px-4 py-2 text-slate-700">{item.name || item.label || item.description}</td>
+                                            <td className="px-4 py-2 text-right text-slate-900 font-medium">{fmt(item.amount)}</td>
                                           </tr>
                                         ))}
                                       </tbody>
@@ -578,16 +580,16 @@ export default function RecordsPage() {
 
                               {r.image_path && (
                                 <div className="col-span-2 md:col-span-4">
-                                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Bill</p>
+                                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Bill</p>
                                   {r.image_path.toLowerCase().endsWith('.pdf') ? (
                                     <a href={r.image_path} target="_blank" rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-blue-600 hover:bg-blue-50 transition-colors">
+                                      className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-blue-600 hover:bg-blue-50 transition-colors">
                                       <FileText className="w-4 h-4" />
                                       View PDF
                                     </a>
                                   ) : (
                                     <a href={r.image_path} target="_blank" rel="noopener noreferrer">
-                                      <img src={r.image_path} alt="Bill" className="h-28 rounded-lg object-contain border border-gray-200 hover:opacity-80 transition-opacity" />
+                                      <img src={r.image_path} alt="Bill" className="h-28 rounded-lg object-contain border border-slate-200 hover:opacity-80 transition-opacity" />
                                     </a>
                                   )}
                                 </div>
@@ -596,7 +598,7 @@ export default function RecordsPage() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -604,15 +606,15 @@ export default function RecordsPage() {
 
             {/* Pagination */}
             {pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                <p className="text-xs text-gray-400">Page {page} of {pages} · {total} records</p>
+              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                <p className="text-xs text-slate-400">Page {page} of {pages} · {total} records</p>
                 <div className="flex gap-1">
                   <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                    className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 disabled:opacity-40">
+                    className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-40">
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}
-                    className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 disabled:opacity-40">
+                    className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 disabled:opacity-40">
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>

@@ -492,9 +492,9 @@ export default function SavingsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-[#166534] text-white">
+                    <tr className="bg-slate-50 border-b border-slate-100">
                       {['Date', 'BU', 'Port', 'Reference', 'I/E', 'Prev. Agent', 'Curr. Agent', 'Old Fee', 'New Fee', 'Savings', 'Description', ''].map(h => (
-                        <th key={h} className="text-left px-3 py-2.5 font-semibold text-xs whitespace-nowrap">{h}</th>
+                        <th key={h} className="text-left px-3 py-2.5 font-semibold text-xs text-slate-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -525,12 +525,12 @@ export default function SavingsPage() {
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-[#dcfce7] border-t-2 border-[#166534]/20">
-                      <td colSpan={7} className="px-3 py-2.5 font-bold text-[#166534] text-sm">TOTAL ({total} records)</td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-[#166534]">
+                    <tr className="bg-brand-50 border-t-2 border-brand-200">
+                      <td colSpan={7} className="px-3 py-2.5 font-bold text-brand-700 text-sm">TOTAL ({total} records)</td>
+                      <td className="px-3 py-2.5 text-right font-mono font-bold text-brand-700">
                         {fmt(records.reduce((s, r) => s + (r.old_fee || 0), 0))}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-[#166534]">
+                      <td className="px-3 py-2.5 text-right font-mono font-bold text-brand-700">
                         {fmt(records.reduce((s, r) => s + (r.new_fee || 0), 0))}
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 text-base">

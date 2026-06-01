@@ -8,25 +8,26 @@ export default {
         heading: ['DM Sans', 'system-ui', 'sans-serif'],
       },
       colors: {
+        // Agthia brand — sage/olive leaf green sampled from the logo mark
         brand: {
-          50:  '#f0fdf4',
-          100: '#dcfce7',
-          200: '#bbf7d0',
-          300: '#86efac',
-          400: '#4ade80',
-          500: '#22c55e',
-          600: '#16a34a',
-          700: '#15803d',
-          800: '#166534',
-          900: '#14532d',
-          950: '#052e16'
+          50:  '#f5f8ef',
+          100: '#e8f1d9',
+          200: '#d2e3b6',
+          300: '#b5cf8a',
+          400: '#98ba60',
+          500: '#7ba046',  // logo leaf green
+          600: '#62833a',  // primary actions / buttons
+          700: '#4c6730',
+          800: '#3e532a',
+          900: '#354626',
+          950: '#1a2611'
         }
       },
       boxShadow: {
         card:         '0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.04)',
         'card-hover': '0 8px 24px 0 rgba(0,0,0,0.10), 0 2px 8px -2px rgba(0,0,0,0.06)',
-        glow:         '0 0 24px 0 rgba(22,163,74,0.25)',
-        'glow-sm':    '0 0 12px 0 rgba(22,163,74,0.18)',
+        glow:         '0 0 24px 0 rgba(123,160,70,0.30)',
+        'glow-sm':    '0 0 12px 0 rgba(123,160,70,0.22)',
       },
       backgroundImage: {
         'dots-pattern': "url(\"data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='1' cy='1' r='1' fill='%23ffffff' fill-opacity='0.08'/%3E%3C/svg%3E\")",
