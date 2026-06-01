@@ -190,7 +190,8 @@ async function parseReceiptFile(filePath, originalName = '', expenseType = 'gene
     messages: [{ role: 'user', content: contentBlocks }]
   });
 
-  const parsed = cleanJson(response.content[0].text);
+  const rawText = response.content[0].text;
+  const parsed = cleanJson(rawText);
 
   // Normalize port to known codes
   if (parsed.port) parsed.port = normalizePort(parsed.port);
@@ -203,9 +204,9 @@ async function parseReceiptFile(filePath, originalName = '', expenseType = 'gene
     if (!Array.isArray(parsed.container_numbers)) {
       parsed.container_numbers = parsed.container_number ? [parsed.container_number] : [];
     }
-    // Also regex-scan the raw response for any container numbers the model put in text but missed in the array
+    // Regex-scan raw response for any container numbers missed in the array
     const containerPattern = /\b([A-Z]{4}\d{7})\b/g;
-    const foundInText = [...raw.matchAll(containerPattern)].map(m => m[1]);
+    const foundInText = [...rawText.matchAll(containerPattern)].map(m => m[1]);
     parsed.container_numbers = [...new Set([...parsed.container_numbers, ...foundInText].filter(Boolean))];
 
     // Deduplicate
