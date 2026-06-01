@@ -3,10 +3,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { parseReceiptFile } = require('../utils/parser');
+const { UPLOADS_DIR } = require('../config/paths');
 
 const router = express.Router();
-
-const UPLOADS_DIR = path.join(__dirname, '../../uploads');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {

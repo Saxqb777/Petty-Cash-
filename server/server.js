@@ -6,6 +6,7 @@ const fs = require('fs');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const { UPLOADS_DIR } = require('./config/paths');
 
 // ── Validate required env vars at startup ─────────────────────────────────────
 const REQUIRED_ENV = ['ANTHROPIC_API_KEY'];
@@ -66,7 +67,7 @@ const apiLimiter = rateLimit({
 app.use('/api', apiLimiter);
 
 // ── Static files ──────────────────────────────────────────────────────────────
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // ── API routes ────────────────────────────────────────────────────────────────
 app.use('/api/records',  recordsRouter);
