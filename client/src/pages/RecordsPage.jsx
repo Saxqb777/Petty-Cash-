@@ -243,7 +243,7 @@ export default function RecordsPage() {
 
   const clearFilters = () => { setSearch(''); setFilterCat(''); setFilterBU(''); setFilterFrom(''); setFilterTo(''); setFilterType(''); setPage(1); };
   const hasFilters = search || filterCat || filterBU || filterFrom || filterTo || filterType;
-  const totalAmt = records.reduce((s, r) => s + r.amount, 0);
+  const totalAmt = records.reduce((s, r) => s + (r.amount_aed || r.amount || 0), 0);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">

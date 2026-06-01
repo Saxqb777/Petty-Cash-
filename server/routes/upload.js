@@ -44,6 +44,7 @@ router.post('/', (req, res, next) => {
 }, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    if (req.file.size === 0) return res.status(400).json({ error: 'Uploaded file is empty' });
 
     const expenseType = req.body.expense_type || 'general';
     let parsed = { ...FALLBACK };

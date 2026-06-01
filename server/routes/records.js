@@ -12,12 +12,20 @@ function getRate(currency) {
   } catch { return 1; }
 }
 
-const parseRecord = (r) => r ? ({
-  ...r,
-  line_items: JSON.parse(r.line_items || '[]'),
-  container_numbers: JSON.parse(r.container_numbers || '[]'),
-  bl_numbers: JSON.parse(r.bl_numbers || '[]'),
-}) : null;
+const parseRecord = (r) => {
+  if (!r) return null;
+  try {
+    return {
+      ...r,
+      line_items:        JSON.parse(r.line_items        || '[]'),
+      container_numbers: JSON.parse(r.container_numbers || '[]'),
+      bl_numbers:        JSON.parse(r.bl_numbers        || '[]'),
+    };
+  } catch (e) {
+    console.error('JSON parse error for record', r.id, e.message);
+    return { ...r, line_items: [], container_numbers: [], bl_numbers: [] };
+  }
+};
 
 // GET all records with optional filters
 router.get('/', (req, res) => {
@@ -103,7 +111,7 @@ router.post('/', (req, res) => {
       if (expense_type === 'shipping' && savings_record && savings_old_fee != null) {
         const parsedItems = Array.isArray(line_items) ? line_items : [];
         // new_fee = total bill paid (what you now pay instead of the old agent covering everything)
-        const new_fee = parsedItems.reduce((s, li) => s + (parseFloat(li.amount || li.amount) || 0), 0) || parseFloat(amount) || 0;
+        const new_fee = parsedItems.reduce((s, li) => s + (parseFloat(li.amount) || 0), 0) || parseFloat(amount) || 0;
         const old_fee = parseFloat(savings_old_fee) || 0;
         const savings = old_fee - new_fee;
         const bls = Array.isArray(bl_numbers) && bl_numbers.length ? bl_numbers : bl_number ? [bl_number] : [];

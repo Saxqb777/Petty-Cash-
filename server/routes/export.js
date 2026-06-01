@@ -169,14 +169,16 @@ router.get('/', async (req, res) => {
     ws1.getRow(11).height = 14;
 
     // By Category
-    const catData = db.prepare(`
-      SELECT category, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total
-      FROM expenses WHERE 1=1
-      ${type==='this_month' ? "AND strftime('%Y-%m',date)='"+thisYM+"'" : ''}
-      ${type==='custom'&&from ? "AND date>='"+from+"'" : ''}
-      ${type==='custom'&&to   ? "AND date<='"+to+"'"   : ''}
-      GROUP BY category ORDER BY total DESC
-    `).all();
+    // By Category — parameterized
+    let catQ = `SELECT category, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total FROM expenses WHERE 1=1`;
+    const catP = [];
+    if (type === 'this_month') { catQ += " AND strftime('%Y-%m',date)=?"; catP.push(thisYM); }
+    else if (type === 'custom') {
+      if (from) { catQ += ' AND date>=?'; catP.push(from); }
+      if (to)   { catQ += ' AND date<=?'; catP.push(to); }
+    }
+    catQ += ' GROUP BY category ORDER BY total DESC';
+    const catData = db.prepare(catQ).all(...catP);
 
     ws1.mergeCells('A12:F12'); sectionLabel(ws1.getCell('A12'), '  SPEND BY CATEGORY'); ws1.getRow(12).height = 24;
     ['Category','Transactions','Amount (AED)','% of Total'].forEach((h, ci) => {
@@ -202,14 +204,16 @@ router.get('/', async (req, res) => {
     });
 
     const buStart = 14 + catData.length + 2;
-    const buData = db.prepare(`
-      SELECT business_unit, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total
-      FROM expenses WHERE 1=1
-      ${type==='this_month' ? "AND strftime('%Y-%m',date)='"+thisYM+"'" : ''}
-      ${type==='custom'&&from ? "AND date>='"+from+"'" : ''}
-      ${type==='custom'&&to   ? "AND date<='"+to+"'"   : ''}
-      GROUP BY business_unit ORDER BY total DESC
-    `).all();
+    // By BU — parameterized
+    let buQ = `SELECT business_unit, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total FROM expenses WHERE 1=1`;
+    const buP = [];
+    if (type === 'this_month') { buQ += " AND strftime('%Y-%m',date)=?"; buP.push(thisYM); }
+    else if (type === 'custom') {
+      if (from) { buQ += ' AND date>=?'; buP.push(from); }
+      if (to)   { buQ += ' AND date<=?'; buP.push(to); }
+    }
+    buQ += ' GROUP BY business_unit ORDER BY total DESC';
+    const buData = db.prepare(buQ).all(...buP);
 
     ws1.mergeCells(`A${buStart}:F${buStart}`); sectionLabel(ws1.getCell(`A${buStart}`), '  SPEND BY BUSINESS UNIT'); ws1.getRow(buStart).height = 24;
     ['Business Unit','Transactions','Amount (AED)','% of Total'].forEach((h, ci) => {
@@ -495,12 +499,15 @@ router.get('/', async (req, res) => {
       gRow.height = 28;
 
       // Net savings summary box
-      const fuelCost = db.prepare(`
-        SELECT COALESCE(SUM(COALESCE(amount_aed,amount)),0) as f FROM expenses WHERE expense_type='adnoc'
-        ${type==='this_month' ? "AND strftime('%Y-%m',date)='"+thisYM+"'" : ''}
-        ${type==='custom'&&from ? "AND date>='"+from+"'" : ''}
-        ${type==='custom'&&to   ? "AND date<='"+to+"'"   : ''}
-      `).get().f;
+      // Fuel cost — parameterized
+      let fuelQ = `SELECT COALESCE(SUM(COALESCE(amount_aed,amount)),0) as f FROM expenses WHERE expense_type='adnoc'`;
+      const fuelP = [];
+      if (type === 'this_month') { fuelQ += " AND strftime('%Y-%m',date)=?"; fuelP.push(thisYM); }
+      else if (type === 'custom') {
+        if (from) { fuelQ += ' AND date>=?'; fuelP.push(from); }
+        if (to)   { fuelQ += ' AND date<=?'; fuelP.push(to); }
+      }
+      const fuelCost = db.prepare(fuelQ).get(...fuelP).f;
 
       const boxStart = ws4.lastRow.number + 2;
       [
