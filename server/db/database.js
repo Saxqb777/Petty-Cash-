@@ -40,6 +40,7 @@ migrate(`ALTER TABLE expenses ADD COLUMN amount_aed REAL`);
 migrate(`ALTER TABLE expenses ADD COLUMN exchange_rate REAL DEFAULT 1`);
 migrate(`ALTER TABLE expenses ADD COLUMN container_numbers TEXT DEFAULT '[]'`);
 migrate(`ALTER TABLE expenses ADD COLUMN bl_numbers TEXT DEFAULT '[]'`);
+migrate(`ALTER TABLE clearance_savings ADD COLUMN expense_id INTEGER REFERENCES expenses(id)`);
 
 // New tables
 db.exec(`

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Upload, FileText, X, CheckCircle, AlertCircle,
   ChevronDown, PenLine, Scan, Fuel, Ship, LayoutGrid,
-  Plus, Trash2, ArrowLeft, MapPin
+  Plus, Trash2, ArrowLeft, MapPin, PiggyBank, TrendingUp
 } from 'lucide-react';
 import { api } from '../utils/api';
 
@@ -188,7 +188,11 @@ function AdnocForm({ form, set, rates }) {
 }
 
 // ─── Shipping Form ────────────────────────────────────────────────────────────
-function ShippingForm({ form, set, charges, setCharges, bls, onBls, containers, onContainers }) {
+function ShippingForm({
+  form, set, charges, setCharges, bls, onBls, containers, onContainers,
+  savingsOldFee, onSavingsOldFee, savingsPrevAgent, onSavingsPrevAgent,
+  recordSaving, onRecordSaving
+}) {
   const total = charges.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
 
   const updateCharge = (i, field, val) =>
@@ -198,6 +202,12 @@ function ShippingForm({ form, set, charges, setCharges, bls, onBls, containers, 
     setCharges(ch => [...ch, { label: '', amount: '', custom: true }]);
 
   const removeCharge = (i) => setCharges(ch => ch.filter((_, idx) => idx !== i));
+
+  // Detect Agent Fee from charges
+  const agentCharge = charges.find(c => (c.label || '').toLowerCase().includes('agent'));
+  const agentFee = agentCharge ? parseFloat(agentCharge.amount) || 0 : 0;
+  const oldFeeNum = parseFloat(savingsOldFee) || 0;
+  const saving = oldFeeNum > 0 ? oldFeeNum - agentFee : null;
 
   return (
     <div className="space-y-5">
@@ -303,6 +313,83 @@ function ShippingForm({ form, set, charges, setCharges, bls, onBls, containers, 
         </button>
       </div>
 
+      {/* Savings Panel */}
+      <div className={`rounded-xl border p-4 ${recordSaving ? 'border-green-200 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <PiggyBank className={`w-4 h-4 ${recordSaving ? 'text-green-600' : 'text-gray-400'}`} />
+            <span className={`text-sm font-semibold ${recordSaving ? 'text-green-800' : 'text-gray-500'}`}>Clearance Savings</span>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <span className="text-xs text-gray-500">Record saving</span>
+            <div
+              onClick={() => onRecordSaving(!recordSaving)}
+              className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${recordSaving ? 'bg-green-500' : 'bg-gray-300'}`}
+            >
+              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${recordSaving ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </div>
+          </label>
+        </div>
+
+        {recordSaving && (
+          <div className="space-y-3">
+            {/* Fee comparison row */}
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="bg-white rounded-lg p-2.5 border border-green-100">
+                <p className="text-xs text-gray-400 mb-0.5">Previous fee</p>
+                <p className="text-sm font-bold text-gray-700">
+                  {oldFeeNum > 0 ? `AED ${fmt(oldFeeNum)}` : <span className="text-gray-300 font-normal">—</span>}
+                </p>
+              </div>
+              <div className="bg-white rounded-lg p-2.5 border border-green-100">
+                <p className="text-xs text-gray-400 mb-0.5">You paid</p>
+                <p className="text-sm font-bold text-gray-700">
+                  {agentFee > 0 ? `AED ${fmt(agentFee)}` : <span className="text-gray-300 font-normal">—</span>}
+                </p>
+              </div>
+              <div className={`rounded-lg p-2.5 border ${saving !== null && saving > 0 ? 'bg-green-100 border-green-200' : saving !== null && saving < 0 ? 'bg-red-50 border-red-100' : 'bg-white border-green-100'}`}>
+                <p className="text-xs text-gray-400 mb-0.5">Saving</p>
+                <p className={`text-sm font-bold ${saving !== null && saving > 0 ? 'text-green-700' : saving !== null && saving < 0 ? 'text-red-600' : 'text-gray-300'}`}>
+                  {saving !== null ? `AED ${fmt(saving)}` : '—'}
+                </p>
+              </div>
+            </div>
+
+            {/* Input fields */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label text-xs">Previous agent fee (AED)</label>
+                <input
+                  className="input text-sm"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={savingsOldFee}
+                  onChange={e => onSavingsOldFee(e.target.value)}
+                  placeholder="e.g. 225"
+                />
+                {oldFeeNum === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">Enter the fee the previous agent used to charge</p>
+                )}
+              </div>
+              <div>
+                <label className="label text-xs">Previous agent name (optional)</label>
+                <input
+                  className="input text-sm"
+                  value={savingsPrevAgent}
+                  onChange={e => onSavingsPrevAgent(e.target.value)}
+                  placeholder="e.g. Al Gharbeya"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!recordSaving && (
+          <p className="text-xs text-gray-400">Turn on to track how much you saved vs. the previous agent</p>
+        )}
+      </div>
+
       <Field label="Notes (optional)">
         <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional info..." />
       </Field>
@@ -381,6 +468,12 @@ export default function UploadPage() {
   const [shippingContainers, setShippingContainers] = useState([]);
   const [generalForm, setGeneralForm] = useState(EMPTY_GENERAL);
 
+  // Savings panel state (shipping only)
+  const [savingsOldFee, setSavingsOldFee] = useState('');
+  const [savingsPrevAgent, setSavingsPrevAgent] = useState('');
+  const [recordSaving, setRecordSaving] = useState(true);
+  const savingsLookupTimer = useRef(null);
+
   const fileRef = useRef();
   const progressRef = useRef(null);
 
@@ -389,10 +482,26 @@ export default function UploadPage() {
     api.getExchangeRates().then(r => setRates(r)).catch(() => {});
   }, []);
 
+  const lookupOldFee = (port, ie) => {
+    if (!port) return;
+    clearTimeout(savingsLookupTimer.current);
+    savingsLookupTimer.current = setTimeout(async () => {
+      try {
+        const r = await api.getAgentRates({ port, import_export: ie });
+        if (r.suggested_fee != null) setSavingsOldFee(String(r.suggested_fee));
+      } catch (_) {}
+    }, 600);
+  };
+
   const setField = (type, k, v) => {
     if (type === 'adnoc') setAdnocForm(f => ({ ...f, [k]: v }));
-    else if (type === 'shipping') setShippingForm(f => ({ ...f, [k]: v }));
-    else setGeneralForm(f => ({ ...f, [k]: v }));
+    else if (type === 'shipping') {
+      setShippingForm(f => {
+        const next = { ...f, [k]: v };
+        if (k === 'port' || k === 'shipment_type') lookupOldFee(next.port, next.shipment_type);
+        return next;
+      });
+    } else setGeneralForm(f => ({ ...f, [k]: v }));
   };
 
   const handleFile = useCallback(async (file) => {
@@ -438,6 +547,9 @@ export default function UploadPage() {
           submitted_by: p.submitted_by || f.submitted_by,
           image_path: result.image_path || ''
         }));
+
+        // Trigger old-fee lookup from extracted port/type
+        if (p.port || p.shipment_type) lookupOldFee(p.port || shippingForm.port, p.shipment_type || shippingForm.shipment_type);
 
         // Map bl_numbers and container_numbers arrays
         if (Array.isArray(p.bl_numbers) && p.bl_numbers.length > 0) setShippingBLs(p.bl_numbers);
@@ -509,6 +621,7 @@ export default function UploadPage() {
       if (!shippingForm.vendor_name || !shippingForm.date) { setError('Shipping line and date are required.'); return; }
       const filled = shippingCharges.filter(c => c.label && parseFloat(c.amount) > 0);
       const total = filled.reduce((s, c) => s + parseFloat(c.amount), 0);
+      const oldFee = parseFloat(savingsOldFee) || 0;
       payload = {
         ...shippingForm,
         bl_number: shippingBLs[0] || shippingForm.bl_number || '',
@@ -516,7 +629,11 @@ export default function UploadPage() {
         container_number: shippingContainers[0] || shippingForm.container_number || '',
         container_numbers: shippingContainers,
         amount: total || 0,
-        line_items: filled
+        line_items: filled,
+        // Savings fields — only sent when recordSaving is on and old fee is provided
+        savings_record: recordSaving && oldFee > 0,
+        savings_old_fee: oldFee,
+        savings_previous_agent: savingsPrevAgent || null,
       };
     } else {
       if (!generalForm.vendor_name || !generalForm.amount || !generalForm.date) {
@@ -543,6 +660,7 @@ export default function UploadPage() {
     setAdnocForm(EMPTY_ADNOC); setShippingForm(EMPTY_SHIPPING); setGeneralForm(EMPTY_GENERAL);
     setShippingCharges(SHIPPING_CHARGES.map(label => ({ label, amount: '' })));
     setShippingBLs([]); setShippingContainers([]);
+    setSavingsOldFee(''); setSavingsPrevAgent(''); setRecordSaving(true);
   };
 
   // ── Type Selection Screen ──────────────────────────────────────────────────
@@ -734,6 +852,12 @@ export default function UploadPage() {
                 onBls={setShippingBLs}
                 containers={shippingContainers}
                 onContainers={setShippingContainers}
+                savingsOldFee={savingsOldFee}
+                onSavingsOldFee={setSavingsOldFee}
+                savingsPrevAgent={savingsPrevAgent}
+                onSavingsPrevAgent={setSavingsPrevAgent}
+                recordSaving={recordSaving}
+                onRecordSaving={setRecordSaving}
               />
             )}
             {expenseType === 'general' && (

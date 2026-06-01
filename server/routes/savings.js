@@ -2,6 +2,43 @@ const express = require('express');
 const db = require('../db/database');
 const router = express.Router();
 
+// GET /api/savings/by-expense/:expenseId — get saving linked to an expense
+router.get('/by-expense/:expenseId', (req, res) => {
+  try {
+    const row = db.prepare('SELECT * FROM clearance_savings WHERE expense_id = ?').get(req.params.expenseId);
+    res.json(row || null);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT /api/savings/:id — update a savings record (e.g. correct old fee)
+router.put('/:id', (req, res) => {
+  try {
+    const existing = db.prepare('SELECT * FROM clearance_savings WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+    const b = req.body;
+    const old_fee = b.old_fee !== undefined ? parseFloat(b.old_fee) : existing.old_fee;
+    const new_fee = b.new_fee !== undefined ? parseFloat(b.new_fee) : existing.new_fee;
+    db.prepare(`
+      UPDATE clearance_savings SET
+        old_fee = ?, new_fee = ?, savings = ?,
+        previous_agent = ?, current_agent = ?,
+        port = ?, import_export = ?, business_unit = ?,
+        description = ?
+      WHERE id = ?
+    `).run(
+      old_fee, new_fee, old_fee - new_fee,
+      b.previous_agent ?? existing.previous_agent,
+      b.current_agent  ?? existing.current_agent,
+      b.port           ?? existing.port,
+      b.import_export  ?? existing.import_export,
+      b.business_unit  ?? existing.business_unit,
+      b.description    ?? existing.description,
+      req.params.id
+    );
+    res.json(db.prepare('SELECT * FROM clearance_savings WHERE id = ?').get(req.params.id));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/savings/agent-rates — suggest old fee for a given previous agent + port + type
 router.get('/agent-rates', (req, res) => {
   try {

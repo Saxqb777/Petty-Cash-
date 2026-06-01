@@ -62,4 +62,6 @@ export const api = {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
     return request(`/savings/agent-rates${qs ? `?${qs}` : ''}`);
   },
+  getSavingByExpense: (expenseId) => request(`/savings/by-expense/${expenseId}`),
+  updateSaving: (id, data) => request(`/savings/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 };

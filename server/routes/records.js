@@ -68,7 +68,9 @@ router.post('/', (req, res) => {
       category, business_unit, payment_method = 'Cash', purpose, submitted_by,
       line_items = [], notes, image_path,
       bl_number, container_number, port, shipment_type,
-      container_numbers = [], bl_numbers = []
+      container_numbers = [], bl_numbers = [],
+      // Savings fields — only for shipping bills
+      savings_old_fee, savings_previous_agent, savings_record = false,
     } = req.body;
 
     if (!vendor_name || !amount || !date || !category) {
@@ -78,23 +80,59 @@ router.post('/', (req, res) => {
     const rate = getRate(currency);
     const amount_aed = parseFloat(amount) * rate;
 
-    const result = db.prepare(`
-      INSERT INTO expenses (expense_type, invoice_number, vendor_name, amount, currency, date,
-        category, business_unit, payment_method, purpose, submitted_by, line_items, notes,
-        image_path, bl_number, container_number, port, shipment_type,
-        amount_aed, exchange_rate, container_numbers, bl_numbers)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      expense_type, invoice_number || null, vendor_name, parseFloat(amount), currency, date,
-      category, business_unit || null, payment_method, purpose || null, submitted_by || null,
-      JSON.stringify(line_items), notes || null, image_path || null,
-      bl_number || null, container_number || null, port || null, shipment_type || null,
-      amount_aed, rate,
-      JSON.stringify(Array.isArray(container_numbers) ? container_numbers : []),
-      JSON.stringify(Array.isArray(bl_numbers) ? bl_numbers : [])
-    );
+    const doInsert = db.transaction(() => {
+      const result = db.prepare(`
+        INSERT INTO expenses (expense_type, invoice_number, vendor_name, amount, currency, date,
+          category, business_unit, payment_method, purpose, submitted_by, line_items, notes,
+          image_path, bl_number, container_number, port, shipment_type,
+          amount_aed, exchange_rate, container_numbers, bl_numbers)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        expense_type, invoice_number || null, vendor_name, parseFloat(amount), currency, date,
+        category, business_unit || null, payment_method, purpose || null, submitted_by || null,
+        JSON.stringify(line_items), notes || null, image_path || null,
+        bl_number || null, container_number || null, port || null, shipment_type || null,
+        amount_aed, rate,
+        JSON.stringify(Array.isArray(container_numbers) ? container_numbers : []),
+        JSON.stringify(Array.isArray(bl_numbers) ? bl_numbers : [])
+      );
 
-    res.status(201).json(parseRecord(db.prepare('SELECT * FROM expenses WHERE id = ?').get(result.lastInsertRowid)));
+      const expenseId = result.lastInsertRowid;
+
+      // Auto-create savings record for shipping bills when old fee is provided
+      if (expense_type === 'shipping' && savings_record && savings_old_fee != null) {
+        const parsedItems = Array.isArray(line_items) ? line_items : [];
+        const agentFeeItem = parsedItems.find(li =>
+          (li.label || li.name || '').toLowerCase().includes('agent')
+        );
+        const new_fee = agentFeeItem ? parseFloat(agentFeeItem.amount || 0) : 0;
+        const old_fee = parseFloat(savings_old_fee) || 0;
+        const savings = old_fee - new_fee;
+        const bls = Array.isArray(bl_numbers) && bl_numbers.length ? bl_numbers : bl_number ? [bl_number] : [];
+
+        // Delete any existing savings record linked to this expense (in case of re-save)
+        db.prepare('DELETE FROM clearance_savings WHERE expense_id = ?').run(expenseId);
+
+        db.prepare(`
+          INSERT INTO clearance_savings
+            (expense_id, date, business_unit, port, import_export, reference_number,
+             previous_agent, current_agent, old_fee, new_fee, savings)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          expenseId, date, business_unit || null, port || null,
+          shipment_type || null,
+          bls.join(', ') || invoice_number || null,
+          savings_previous_agent || null,
+          vendor_name,
+          old_fee, new_fee, savings
+        );
+      }
+
+      return expenseId;
+    });
+
+    const expenseId = doInsert();
+    res.status(201).json(parseRecord(db.prepare('SELECT * FROM expenses WHERE id = ?').get(expenseId)));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
