@@ -15,6 +15,8 @@ process.on('uncaughtException', (err) => {
 const recordsRouter = require('./routes/records');
 const uploadRouter = require('./routes/upload');
 const exportRouter = require('./routes/export');
+const settingsRouter = require('./routes/settings');
+const savingsRouter = require('./routes/savings');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,6 +28,8 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/records', recordsRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/export', exportRouter);
+app.use('/api/settings', settingsRouter);
+app.use('/api/savings', savingsRouter);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 

@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Upload, FileText, X, CheckCircle, AlertCircle,
   ChevronDown, PenLine, Scan, Fuel, Ship, LayoutGrid,
-  Plus, Trash2, ArrowLeft
+  Plus, Trash2, ArrowLeft, MapPin
 } from 'lucide-react';
 import { api } from '../utils/api';
 
@@ -14,6 +14,7 @@ const CATEGORIES = [
 ];
 const BUS = ['AAFB', 'Al Foah', 'GMFF', 'BMB', 'Other'];
 const PORTS = ['AUH', 'DXB', 'AJM', 'SHJ', 'Other'];
+const CURRENCIES = ['AED', 'USD', 'EUR', 'GBP', 'SAR', 'QAR', 'KWD', 'OMR'];
 
 const SHIPPING_CHARGES = [
   'Ocean Freight', 'THC (Terminal Handling)', 'Demurrage', 'Detention',
@@ -26,7 +27,7 @@ const EMPTY_ADNOC = {
   invoice_number: '', amount: '', currency: 'AED',
   date: new Date().toISOString().split('T')[0],
   business_unit: '', payment_method: 'Card',
-  submitted_by: '', notes: '', image_path: ''
+  purpose: '', submitted_by: '', notes: '', image_path: ''
 };
 
 const EMPTY_SHIPPING = {
@@ -68,8 +69,80 @@ function Sel({ value, onChange, options, placeholder = 'Select...' }) {
   );
 }
 
+// Chip input component for BLs / containers
+function ChipInput({ chips, onChange, placeholder }) {
+  const [val, setVal] = useState('');
+  const add = () => {
+    const t = val.trim().toUpperCase();
+    if (t && !chips.includes(t)) { onChange([...chips, t]); setVal(''); }
+  };
+  const remove = (chip) => onChange(chips.filter(c => c !== chip));
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {chips.map(c => (
+          <span key={c} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-xs font-mono font-medium border border-blue-100">
+            {c}
+            <button onClick={() => remove(c)} className="text-blue-400 hover:text-red-500">
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          className="input flex-1 text-sm font-mono"
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          placeholder={placeholder}
+        />
+        <button type="button" onClick={add} className="btn-secondary text-xs flex items-center gap-1 flex-shrink-0 px-2.5">
+          <Plus className="w-3 h-3" /> Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Currency amount with AED preview
+function CurrencyAmount({ amount, currency, onAmount, onCurrency, rates }) {
+  const rate = rates[currency] || 1;
+  const aedPreview = currency !== 'AED' && amount ? parseFloat(amount) * rate : null;
+  return (
+    <div>
+      <div className="flex gap-2">
+        <input
+          className="input flex-1"
+          type="number"
+          step="0.01"
+          value={amount}
+          onChange={e => onAmount(e.target.value)}
+          placeholder="0.00"
+        />
+        <div className="relative w-28 flex-shrink-0">
+          <select
+            value={currency}
+            onChange={e => onCurrency(e.target.value)}
+            className="input appearance-none pr-7 cursor-pointer"
+          >
+            {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+        </div>
+      </div>
+      {aedPreview !== null && (
+        <p className="text-xs text-amber-600 mt-1 font-medium">
+          ≈ AED {aedPreview.toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <span className="text-gray-400 font-normal ml-1">(rate: {rate})</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── ADNOC Form ───────────────────────────────────────────────────────────────
-function AdnocForm({ form, set }) {
+function AdnocForm({ form, set, rates }) {
   return (
     <div className="grid grid-cols-2 gap-4">
       <Field label="Invoice / Receipt No.">
@@ -78,8 +151,14 @@ function AdnocForm({ form, set }) {
       <Field label="Date">
         <input className="input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
       </Field>
-      <Field label="Amount (AED)">
-        <input className="input" type="number" step="0.01" value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0.00" />
+      <Field label="Amount">
+        <CurrencyAmount
+          amount={form.amount}
+          currency={form.currency}
+          onAmount={v => set('amount', v)}
+          onCurrency={v => set('currency', v)}
+          rates={rates}
+        />
       </Field>
       <Field label="Payment Method">
         <Sel value={form.payment_method} onChange={v => set('payment_method', v)} options={['Card', 'Cash']} />
@@ -90,6 +169,17 @@ function AdnocForm({ form, set }) {
       <Field label="Submitted By">
         <input className="input" value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} placeholder="Name" />
       </Field>
+      <Field label="Trip / Route Details" span2>
+        <div className="relative">
+          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <input
+            className="input pl-9"
+            value={form.purpose}
+            onChange={e => set('purpose', e.target.value)}
+            placeholder="e.g. Abu Dhabi Airport — HUSKY Air Shipment Collection"
+          />
+        </div>
+      </Field>
       <Field label="Notes (optional)" span2>
         <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional info..." />
       </Field>
@@ -98,7 +188,7 @@ function AdnocForm({ form, set }) {
 }
 
 // ─── Shipping Form ────────────────────────────────────────────────────────────
-function ShippingForm({ form, set, charges, setCharges }) {
+function ShippingForm({ form, set, charges, setCharges, bls, onBls, containers, onContainers }) {
   const total = charges.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
 
   const updateCharge = (i, field, val) =>
@@ -119,12 +209,23 @@ function ShippingForm({ form, set, charges, setCharges }) {
         <Field label="Invoice / Reference No.">
           <input className="input" value={form.invoice_number} onChange={e => set('invoice_number', e.target.value)} placeholder="INV-12345" />
         </Field>
-        <Field label="BL Number (Bill of Lading)">
-          <input className="input" value={form.bl_number} onChange={e => set('bl_number', e.target.value)} placeholder="e.g. BL-SJEA5D05777" />
+
+        <Field label="BL Numbers (Bill of Lading)" span2>
+          <ChipInput
+            chips={bls}
+            onChange={onBls}
+            placeholder="Type BL number, press Enter to add..."
+          />
         </Field>
-        <Field label="Container Number (optional)">
-          <input className="input" value={form.container_number} onChange={e => set('container_number', e.target.value)} placeholder="e.g. MSCU1234567" />
+
+        <Field label="Container Numbers" span2>
+          <ChipInput
+            chips={containers}
+            onChange={onContainers}
+            placeholder="Type container number, press Enter to add..."
+          />
         </Field>
+
         <Field label="Port">
           <Sel value={form.port} onChange={v => set('port', v)} options={PORTS} placeholder="Select port" />
         </Field>
@@ -210,7 +311,7 @@ function ShippingForm({ form, set, charges, setCharges }) {
 }
 
 // ─── General Form ─────────────────────────────────────────────────────────────
-function GeneralForm({ form, set }) {
+function GeneralForm({ form, set, rates }) {
   return (
     <div className="grid grid-cols-2 gap-4">
       <Field label="Vendor / Shop Name">
@@ -220,10 +321,13 @@ function GeneralForm({ form, set }) {
         <input className="input" value={form.invoice_number} onChange={e => set('invoice_number', e.target.value)} placeholder="Receipt #" />
       </Field>
       <Field label="Amount">
-        <div className="flex gap-2">
-          <input className="input flex-1" type="number" step="0.01" value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0.00" />
-          <Sel value={form.currency} onChange={v => set('currency', v)} options={['AED', 'USD', 'EUR']} placeholder="AED" />
-        </div>
+        <CurrencyAmount
+          amount={form.amount}
+          currency={form.currency}
+          onAmount={v => set('amount', v)}
+          onCurrency={v => set('currency', v)}
+          rates={rates}
+        />
       </Field>
       <Field label="Date">
         <input className="input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
@@ -263,26 +367,33 @@ export default function UploadPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [stage, setStage] = useState('idle');
-
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Exchange rates for AED preview
+  const [rates, setRates] = useState({ AED: 1, USD: 3.6725, EUR: 4.02, GBP: 4.68, SAR: 0.98, QAR: 1.01, KWD: 11.96, OMR: 9.53 });
 
   const [adnocForm, setAdnocForm] = useState(EMPTY_ADNOC);
   const [shippingForm, setShippingForm] = useState(EMPTY_SHIPPING);
   const [shippingCharges, setShippingCharges] = useState(
     SHIPPING_CHARGES.map(label => ({ label, amount: '' }))
   );
+  const [shippingBLs, setShippingBLs] = useState([]);
+  const [shippingContainers, setShippingContainers] = useState([]);
   const [generalForm, setGeneralForm] = useState(EMPTY_GENERAL);
 
   const fileRef = useRef();
   const progressRef = useRef(null);
+
+  // Load exchange rates on mount
+  useEffect(() => {
+    api.getExchangeRates().then(r => setRates(r)).catch(() => {});
+  }, []);
 
   const setField = (type, k, v) => {
     if (type === 'adnoc') setAdnocForm(f => ({ ...f, [k]: v }));
     else if (type === 'shipping') setShippingForm(f => ({ ...f, [k]: v }));
     else setGeneralForm(f => ({ ...f, [k]: v }));
   };
-
-  const activeForm = expenseType === 'adnoc' ? adnocForm : expenseType === 'shipping' ? shippingForm : generalForm;
 
   const handleFile = useCallback(async (file) => {
     if (!file) return;
@@ -328,17 +439,22 @@ export default function UploadPage() {
           image_path: result.image_path || ''
         }));
 
+        // Map bl_numbers and container_numbers arrays
+        if (Array.isArray(p.bl_numbers) && p.bl_numbers.length > 0) setShippingBLs(p.bl_numbers);
+        else if (p.bl_number) setShippingBLs([p.bl_number]);
+
+        if (Array.isArray(p.container_numbers) && p.container_numbers.length > 0) setShippingContainers(p.container_numbers);
+        else if (p.container_number) setShippingContainers([p.container_number]);
+
         // Map extracted line_items back to charge fields
         if (Array.isArray(p.line_items) && p.line_items.length > 0) {
           const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          // Fill standard charges from extracted data
           setShippingCharges(current =>
             current.map(c => {
               const match = p.line_items.find(li => normalize(li.name) === normalize(c.label));
               return match ? { ...c, amount: match.amount > 0 ? match.amount.toString() : '' } : c;
             })
           );
-          // Add any extra charges from the bill that aren't in the standard list
           const standardNorm = SHIPPING_CHARGES.map(normalize);
           const extras = p.line_items.filter(li => {
             const n = normalize(li.name);
@@ -393,7 +509,15 @@ export default function UploadPage() {
       if (!shippingForm.vendor_name || !shippingForm.date) { setError('Shipping line and date are required.'); return; }
       const filled = shippingCharges.filter(c => c.label && parseFloat(c.amount) > 0);
       const total = filled.reduce((s, c) => s + parseFloat(c.amount), 0);
-      payload = { ...shippingForm, amount: total || 0, line_items: filled };
+      payload = {
+        ...shippingForm,
+        bl_number: shippingBLs[0] || shippingForm.bl_number || '',
+        bl_numbers: shippingBLs,
+        container_number: shippingContainers[0] || shippingForm.container_number || '',
+        container_numbers: shippingContainers,
+        amount: total || 0,
+        line_items: filled
+      };
     } else {
       if (!generalForm.vendor_name || !generalForm.amount || !generalForm.date) {
         setError('Vendor, amount, and date are required.'); return;
@@ -418,6 +542,7 @@ export default function UploadPage() {
     setStage('idle'); setSaved(false); setError('');
     setAdnocForm(EMPTY_ADNOC); setShippingForm(EMPTY_SHIPPING); setGeneralForm(EMPTY_GENERAL);
     setShippingCharges(SHIPPING_CHARGES.map(label => ({ label, amount: '' })));
+    setShippingBLs([]); setShippingContainers([]);
   };
 
   // ── Type Selection Screen ──────────────────────────────────────────────────
@@ -597,7 +722,7 @@ export default function UploadPage() {
         {(inputMode === 'manual' || stage === 'extracted' || inputMode === 'upload') && (
           <div className={`${inputMode === 'upload' && stage === 'extracted' ? 'col-span-3' : 'col-span-1'} card p-6 fade-in`}>
             {expenseType === 'adnoc' && (
-              <AdnocForm form={adnocForm} set={(k, v) => setField('adnoc', k, v)} />
+              <AdnocForm form={adnocForm} set={(k, v) => setField('adnoc', k, v)} rates={rates} />
             )}
             {expenseType === 'shipping' && (
               <ShippingForm
@@ -605,10 +730,14 @@ export default function UploadPage() {
                 set={(k, v) => setField('shipping', k, v)}
                 charges={shippingCharges}
                 setCharges={setShippingCharges}
+                bls={shippingBLs}
+                onBls={setShippingBLs}
+                containers={shippingContainers}
+                onContainers={setShippingContainers}
               />
             )}
             {expenseType === 'general' && (
-              <GeneralForm form={generalForm} set={(k, v) => setField('general', k, v)} />
+              <GeneralForm form={generalForm} set={(k, v) => setField('general', k, v)} rates={rates} />
             )}
 
             <div className="flex gap-3 mt-6 pt-4 border-t border-gray-100">

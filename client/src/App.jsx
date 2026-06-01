@@ -5,6 +5,7 @@ import DashboardPage from './pages/DashboardPage';
 import UploadPage from './pages/UploadPage';
 import RecordsPage from './pages/RecordsPage';
 import SettingsPage from './pages/SettingsPage';
+import SavingsPage from './pages/SavingsPage';
 
 const pageVariants = {
   initial: { opacity: 0, y: 10 },
@@ -29,6 +30,7 @@ function AnimatedRoutes() {
         <Route path="/upload"   element={<PageWrapper><UploadPage /></PageWrapper>} />
         <Route path="/records"  element={<PageWrapper><RecordsPage /></PageWrapper>} />
         <Route path="/settings" element={<PageWrapper><SettingsPage /></PageWrapper>} />
+        <Route path="/savings"  element={<PageWrapper><SavingsPage /></PageWrapper>} />
       </Routes>
     </AnimatePresence>
   );

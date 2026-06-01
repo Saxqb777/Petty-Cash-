@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Building2, Users, Tag, DollarSign, Save, CheckCircle, Plus, X, Palette, Globe } from 'lucide-react';
-import { cn } from '../lib/utils';
-
-const STORAGE_KEY = 'agthia_settings';
+import { Building2, Users, Tag, DollarSign, Save, CheckCircle, Plus, X, Globe, RefreshCw } from 'lucide-react';
+import { api } from '../utils/api';
 
 const DEFAULTS = {
-  companyName:   'Agthia Group',
-  department:    'Finance',
-  defaultCurrency: 'AED',
-  defaultBU:     '',
-  monthlyBudget: '',
+  companyName:       'Agthia Group',
+  department:        'Finance',
+  defaultCurrency:   'AED',
+  defaultBU:         '',
+  monthlyBudget:     '',
   categories: [
     'Fuel & Transport','Parking','Customs & Clearance','Printing & Photocopy',
     'Materials & Supplies','Food & Beverages','Office Supplies',
@@ -18,13 +16,12 @@ const DEFAULTS = {
   ],
   businessUnits: ['AAFB','Al Foah','GMFF','BMB','Other'],
   approvalThreshold: '500',
-  fiscalYearStart: '01',
+  fiscalYearStart:   '01',
 };
 
-function load() {
-  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') }; }
-  catch { return DEFAULTS; }
-}
+const CURRENCIES = ['USD','EUR','GBP','SAR','QAR','KWD','OMR','INR'];
+
+const DEFAULT_RATES = { USD: 3.6725, EUR: 4.02, GBP: 4.68, SAR: 0.98, QAR: 1.01, KWD: 11.96, OMR: 9.53, INR: 0.044 };
 
 function Section({ icon: Icon, title, description, children }) {
   return (
@@ -87,19 +84,74 @@ const item = {
 };
 
 export default function SettingsPage() {
-  const [cfg, setCfg] = useState(load);
+  const [cfg, setCfg] = useState(DEFAULTS);
+  const [rates, setRates] = useState(DEFAULT_RATES);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
 
   const set = (k, v) => setCfg(c => ({ ...c, [k]: v }));
+  const setRate = (currency, val) => setRates(r => ({ ...r, [currency]: val }));
 
-  const save = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const data = await api.getSettings();
+        const app = data.app_settings || {};
+        setCfg({
+          companyName:       app.companyName       || DEFAULTS.companyName,
+          department:        app.department        || DEFAULTS.department,
+          defaultCurrency:   app.defaultCurrency   || DEFAULTS.defaultCurrency,
+          defaultBU:         app.defaultBU         || DEFAULTS.defaultBU,
+          monthlyBudget:     app.monthlyBudget      || DEFAULTS.monthlyBudget,
+          categories:        app.categories        || DEFAULTS.categories,
+          businessUnits:     app.businessUnits     || DEFAULTS.businessUnits,
+          approvalThreshold: app.approvalThreshold || DEFAULTS.approvalThreshold,
+          fiscalYearStart:   app.fiscalYearStart   || DEFAULTS.fiscalYearStart,
+        });
+        if (data.exchange_rates) {
+          setRates({ ...DEFAULT_RATES, ...data.exchange_rates });
+        }
+      } catch (e) {
+        setError('Could not load settings: ' + e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const save = async () => {
+    setSaving(true); setError('');
+    try {
+      const parsedRates = {};
+      CURRENCIES.forEach(c => {
+        parsedRates[c] = parseFloat(rates[c]) || DEFAULT_RATES[c];
+      });
+      await api.updateSettings({
+        app_settings: cfg,
+        exchange_rates: parsedRates,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e) {
+      setError('Save failed: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const MONTHS = ['January','February','March','April','May','June',
     'July','August','September','October','November','December'];
+
+  if (loading) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto flex items-center gap-3 text-slate-400">
+        <RefreshCw className="w-4 h-4 animate-spin" /> Loading settings...
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -110,10 +162,18 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-heading font-bold text-slate-900 tracking-tight">Settings</h1>
           <p className="text-sm text-slate-400 mt-0.5 font-medium">Configure your petty cash workspace</p>
         </div>
-        <button onClick={save} className="btn-primary flex items-center gap-2 text-sm">
-          {saved ? <><CheckCircle className="w-4 h-4" /> Saved!</> : <><Save className="w-4 h-4" /> Save Changes</>}
+        <button onClick={save} disabled={saving} className="btn-primary flex items-center gap-2 text-sm">
+          {saving
+            ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</>
+            : saved
+            ? <><CheckCircle className="w-4 h-4" /> Saved!</>
+            : <><Save className="w-4 h-4" /> Save Changes</>}
         </button>
       </motion.div>
+
+      {error && (
+        <div className="mb-5 p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">{error}</div>
+      )}
 
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
 
@@ -153,7 +213,7 @@ export default function SettingsPage() {
               <div>
                 <label className="label">Default Currency</label>
                 <select className="input" value={cfg.defaultCurrency} onChange={e => set('defaultCurrency', e.target.value)}>
-                  {['AED','USD','EUR','GBP','SAR','QAR'].map(c => <option key={c} value={c}>{c}</option>)}
+                  {['AED','USD','EUR','GBP','SAR','QAR','KWD','OMR'].map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
@@ -170,6 +230,31 @@ export default function SettingsPage() {
                 <p className="text-xs text-slate-400 mt-1">Expenses above this amount are flagged for review</p>
               </div>
             </div>
+          </Section>
+        </motion.div>
+
+        {/* Exchange Rates */}
+        <motion.div variants={item}>
+          <Section icon={Globe} title="Exchange Rates" description="Rates used to convert foreign currency expenses to AED">
+            <div className="grid grid-cols-2 gap-3">
+              {CURRENCIES.map(cur => (
+                <div key={cur} className="flex items-center gap-3">
+                  <span className="text-sm font-semibold text-slate-600 w-10">1 {cur}</span>
+                  <span className="text-slate-400 text-sm">=</span>
+                  <input
+                    className="input flex-1 text-sm"
+                    type="number"
+                    step="0.0001"
+                    min="0"
+                    value={rates[cur] ?? DEFAULT_RATES[cur]}
+                    onChange={e => setRate(cur, e.target.value)}
+                    placeholder={String(DEFAULT_RATES[cur])}
+                  />
+                  <span className="text-sm text-slate-500">AED</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400 mt-3">These rates are used to calculate AED equivalents when recording foreign currency expenses.</p>
           </Section>
         </motion.div>
 

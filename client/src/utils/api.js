@@ -39,5 +39,23 @@ export const api = {
   exportUrl: (params = {}) => {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
     return `${BASE}/export${qs ? `?${qs}` : ''}`;
-  }
+  },
+
+  // Settings
+  getSettings: () => request('/settings'),
+  updateSettings: (data) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  getExchangeRates: () => request('/settings/exchange-rates'),
+
+  // Savings
+  getSavingsSummary: (params = {}) => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+    return request(`/savings/summary${qs ? `?${qs}` : ''}`);
+  },
+  getSavings: (params = {}) => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+    return request(`/savings${qs ? `?${qs}` : ''}`);
+  },
+  createSaving: (data) => request('/savings', { method: 'POST', body: JSON.stringify(data) }),
+  bulkSavings: (records) => request('/savings/bulk', { method: 'POST', body: JSON.stringify(records) }),
+  deleteSaving: (id) => request(`/savings/${id}`, { method: 'DELETE' }),
 };

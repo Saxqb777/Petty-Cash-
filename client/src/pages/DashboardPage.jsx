@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { DollarSign, Calendar, Tag, BarChart2, Plus, RefreshCw, ArrowRight } from 'lucide-react';
+import { DollarSign, Calendar, BarChart2, Plus, RefreshCw, ArrowRight, PiggyBank, Fuel, TrendingUp } from 'lucide-react';
 import StatsCard from '../components/StatsCard';
 import CategoryDonutChart from '../components/CategoryDonutChart';
 import MonthlyBarChart from '../components/MonthlyBarChart';
@@ -133,10 +133,43 @@ export default function DashboardPage() {
         </motion.div>
       </motion.div>
 
+      {/* Savings Strip */}
+      {!loading && stats && (stats.savingsGross > 0 || stats.fuelSpent > 0) && (
+        <motion.div variants={item} className="grid grid-cols-3 gap-4 mb-5">
+          <div className="card p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+              <PiggyBank className="w-4.5 h-4.5 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 font-medium">Gross Clearance Savings</p>
+              <p className="text-base font-bold text-slate-800">AED {fmt(stats.savingsGross)}</p>
+            </div>
+          </div>
+          <div className="card p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+              <Fuel className="w-4.5 h-4.5 text-orange-600" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 font-medium">Fuel Cost (Self-Clearance)</p>
+              <p className="text-base font-bold text-slate-800">AED {fmt(stats.fuelSpent)}</p>
+            </div>
+          </div>
+          <div className="card p-4 flex items-center gap-3 border-brand-200 bg-brand-50/30">
+            <div className="w-9 h-9 rounded-xl bg-brand-100 flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="w-4.5 h-4.5 text-brand-600" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 font-medium">Net Savings</p>
+              <p className={`text-base font-bold ${stats.savingsNet >= 0 ? 'text-brand-700' : 'text-red-600'}`}>AED {fmt(stats.savingsNet)}</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Recent Transactions */}
       <motion.div
         variants={item} initial="hidden" animate="show"
-        className="card p-5"
+        className="card p-5 mb-5"
       >
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -154,6 +187,40 @@ export default function DashboardPage() {
           ? <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
           : <RecentTransactions transactions={stats?.recentTransactions || []} />
         }
+      </motion.div>
+
+      {/* Savings Overview */}
+      <motion.div variants={item} initial="hidden" animate="show" className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="font-heading font-bold text-slate-800">Self-Clearance Savings</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Agent fees saved minus fuel costs</p>
+          </div>
+          <button onClick={() => navigate('/savings')} className="text-xs text-brand-600 font-semibold flex items-center gap-1">
+            Manage <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {loading ? <Skeleton className="h-20" /> : (
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-3 bg-brand-50 rounded-xl">
+              <p className="text-xs text-brand-600 font-semibold mb-1">GROSS SAVINGS</p>
+              <p className="text-xl font-bold font-heading text-brand-700">AED {fmt(stats?.savingsGross)}</p>
+              <p className="text-xs text-slate-400">Agent fees reduced</p>
+            </div>
+            <div className="text-center p-3 bg-orange-50 rounded-xl">
+              <p className="text-xs text-orange-600 font-semibold mb-1">FUEL COST</p>
+              <p className="text-xl font-bold font-heading text-orange-700">AED {fmt(stats?.fuelSpent)}</p>
+              <p className="text-xs text-slate-400">Self-clearance fuel</p>
+            </div>
+            <div className={`text-center p-3 rounded-xl ${(stats?.savingsNet || 0) >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+              <p className={`text-xs font-semibold mb-1 ${(stats?.savingsNet || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>NET SAVINGS</p>
+              <p className={`text-xl font-bold font-heading ${(stats?.savingsNet || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                AED {fmt(Math.abs(stats?.savingsNet))}
+              </p>
+              <p className="text-xs text-slate-400">Net benefit</p>
+            </div>
+          </div>
+        )}
       </motion.div>
     </div>
   );

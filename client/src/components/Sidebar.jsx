@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Table2, Settings, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Table2, Settings, TrendingUp, PiggyBank } from 'lucide-react';
 
 const nav = [
   { to: '/',        icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/upload',  icon: PlusCircle,      label: 'Add Expense' },
   { to: '/records', icon: Table2,          label: 'Records' },
+  { to: '/savings', icon: PiggyBank,       label: 'Savings' },
   { to: '/settings',icon: Settings,        label: 'Settings' },
 ];
 
