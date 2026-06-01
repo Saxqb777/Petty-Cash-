@@ -815,7 +815,16 @@ export default function UploadPage() {
                     <img src={preview} alt="Bill" className="w-full object-contain max-h-72" />
                   )}
                   {!uploading && (
-                    <button onClick={() => { setPreview(null); setStage('idle'); }}
+                    <button onClick={() => {
+                      setPreview(null); setStage('idle'); setFileName(''); setError('');
+                      if (expenseType === 'adnoc') setAdnocForm(EMPTY_ADNOC);
+                      else if (expenseType === 'shipping') {
+                        setShippingForm(EMPTY_SHIPPING);
+                        setShippingBLs([]); setShippingContainers([]);
+                        setShippingCharges(SHIPPING_CHARGES.map(label => ({ label, amount: '' })));
+                        setSavingsOldFee(''); setSavingsPrevAgent('');
+                      } else setGeneralForm(EMPTY_GENERAL);
+                    }}
                       className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full shadow flex items-center justify-center hover:bg-red-50">
                       <X className="w-4 h-4 text-gray-500" />
                     </button>
