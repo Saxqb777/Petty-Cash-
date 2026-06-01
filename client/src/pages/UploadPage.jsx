@@ -203,11 +203,9 @@ function ShippingForm({
 
   const removeCharge = (i) => setCharges(ch => ch.filter((_, idx) => idx !== i));
 
-  // Detect Agent Fee from charges
-  const agentCharge = charges.find(c => (c.label || '').toLowerCase().includes('agent'));
-  const agentFee = agentCharge ? parseFloat(agentCharge.amount) || 0 : 0;
+  // new_fee = total bill paid (what you now pay instead of the old agent)
   const oldFeeNum = parseFloat(savingsOldFee) || 0;
-  const saving = oldFeeNum > 0 ? oldFeeNum - agentFee : null;
+  const saving = oldFeeNum > 0 && total > 0 ? oldFeeNum - total : null;
 
   return (
     <div className="space-y-5">
@@ -344,7 +342,7 @@ function ShippingForm({
               <div className="bg-white rounded-lg p-2.5 border border-green-100">
                 <p className="text-xs text-gray-400 mb-0.5">You paid</p>
                 <p className="text-sm font-bold text-gray-700">
-                  {agentFee > 0 ? `AED ${fmt(agentFee)}` : <span className="text-gray-300 font-normal">—</span>}
+                  {total > 0 ? `AED ${fmt(total)}` : <span className="text-gray-300 font-normal">—</span>}
                 </p>
               </div>
               <div className={`rounded-lg p-2.5 border ${saving !== null && saving > 0 ? 'bg-green-100 border-green-200' : saving !== null && saving < 0 ? 'bg-red-50 border-red-100' : 'bg-white border-green-100'}`}>

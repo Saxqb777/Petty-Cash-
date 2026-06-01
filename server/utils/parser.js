@@ -190,10 +190,14 @@ async function parseReceiptFile(filePath, originalName = '', expenseType = 'gene
   const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 4096,
-    messages: [{ role: 'user', content: contentBlocks }]
+    messages: [
+      { role: 'user', content: contentBlocks },
+      { role: 'assistant', content: '{' }
+    ]
   });
 
-  const parsed = cleanJson(response.content[0].text);
+  const raw = '{' + response.content[0].text;
+  const parsed = cleanJson(raw);
 
   // Normalize port to known codes
   if (parsed.port) parsed.port = normalizePort(parsed.port);

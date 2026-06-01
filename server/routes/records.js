@@ -102,10 +102,8 @@ router.post('/', (req, res) => {
       // Auto-create savings record for shipping bills when old fee is provided
       if (expense_type === 'shipping' && savings_record && savings_old_fee != null) {
         const parsedItems = Array.isArray(line_items) ? line_items : [];
-        const agentFeeItem = parsedItems.find(li =>
-          (li.label || li.name || '').toLowerCase().includes('agent')
-        );
-        const new_fee = agentFeeItem ? parseFloat(agentFeeItem.amount || 0) : 0;
+        // new_fee = total bill paid (what you now pay instead of the old agent covering everything)
+        const new_fee = parsedItems.reduce((s, li) => s + (parseFloat(li.amount || li.amount) || 0), 0) || parseFloat(amount) || 0;
         const old_fee = parseFloat(savings_old_fee) || 0;
         const savings = old_fee - new_fee;
         const bls = Array.isArray(bl_numbers) && bl_numbers.length ? bl_numbers : bl_number ? [bl_number] : [];
