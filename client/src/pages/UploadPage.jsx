@@ -547,51 +547,51 @@ export default function UploadPage() {
           image_path: result.image_path || ''
         }));
       } else if (expenseType === 'shipping') {
-        setShippingForm(f => ({
-          ...f,
-          vendor_name: p.vendor_name || f.vendor_name,
-          invoice_number: p.invoice_number || f.invoice_number,
-          bl_number: p.bl_number || f.bl_number,
-          container_number: p.container_number || f.container_number,
-          port: p.port || f.port,
-          shipment_type: p.shipment_type || f.shipment_type,
-          date: p.date || f.date,
-          business_unit: p.business_unit || f.business_unit,
-          submitted_by: p.submitted_by || f.submitted_by,
+        // Reset form completely before applying new scan — prevents merging two bills
+        setShippingForm({
+          ...EMPTY_SHIPPING,
+          vendor_name: p.vendor_name || '',
+          invoice_number: p.invoice_number || '',
+          bl_number: p.bl_number || '',
+          container_number: p.container_number || '',
+          port: p.port || '',
+          shipment_type: p.shipment_type || 'Import',
+          date: p.date || EMPTY_SHIPPING.date,
+          business_unit: p.business_unit || '',
+          submitted_by: p.submitted_by || '',
           image_path: result.image_path || ''
-        }));
+        });
 
-        // Trigger old-fee lookup from extracted port/type
-        if (p.port || p.shipment_type) lookupOldFee(p.port || shippingForm.port, p.shipment_type || shippingForm.shipment_type);
+        // Reset BLs and containers to only what was extracted
+        setShippingBLs(
+          Array.isArray(p.bl_numbers) && p.bl_numbers.length > 0 ? p.bl_numbers :
+          p.bl_number ? [p.bl_number] : []
+        );
+        setShippingContainers(
+          Array.isArray(p.container_numbers) && p.container_numbers.length > 0 ? p.container_numbers :
+          p.container_number ? [p.container_number] : []
+        );
 
-        // Map bl_numbers and container_numbers arrays
-        if (Array.isArray(p.bl_numbers) && p.bl_numbers.length > 0) setShippingBLs(p.bl_numbers);
-        else if (p.bl_number) setShippingBLs([p.bl_number]);
-
-        if (Array.isArray(p.container_numbers) && p.container_numbers.length > 0) setShippingContainers(p.container_numbers);
-        else if (p.container_number) setShippingContainers([p.container_number]);
-
-        // Map extracted line_items back to charge fields
+        // Reset charges then apply extracted line_items
+        const freshCharges = SHIPPING_CHARGES.map(label => ({ label, amount: '' }));
         if (Array.isArray(p.line_items) && p.line_items.length > 0) {
           const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          setShippingCharges(current =>
-            current.map(c => {
-              const match = p.line_items.find(li => normalize(li.name) === normalize(c.label));
-              return match ? { ...c, amount: match.amount > 0 ? match.amount.toString() : '' } : c;
-            })
-          );
+          const mapped = freshCharges.map(c => {
+            const match = p.line_items.find(li => normalize(li.name) === normalize(c.label));
+            return match ? { ...c, amount: match.amount > 0 ? match.amount.toString() : '' } : c;
+          });
           const standardNorm = SHIPPING_CHARGES.map(normalize);
           const extras = p.line_items.filter(li => {
             const n = normalize(li.name);
             return !standardNorm.includes(n) && parseFloat(li.amount) > 0;
           });
-          if (extras.length > 0) {
-            setShippingCharges(c => [
-              ...c,
-              ...extras.map(e => ({ label: e.name, amount: e.amount.toString(), custom: true }))
-            ]);
-          }
+          setShippingCharges([...mapped, ...extras.map(e => ({ label: e.name, amount: e.amount.toString(), custom: true }))]);
+        } else {
+          setShippingCharges(freshCharges);
         }
+
+        // Trigger old-fee lookup from extracted port/type
+        if (p.port || p.shipment_type) lookupOldFee(p.port || '', p.shipment_type || 'Import');
       } else {
         setGeneralForm(f => ({
           ...f,
