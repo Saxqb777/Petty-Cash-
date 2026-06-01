@@ -47,15 +47,18 @@ router.post('/', (req, res, next) => {
 
     const expenseType = req.body.expense_type || 'general';
     let parsed = { ...FALLBACK };
+    let parseError = null;
     try {
       parsed = await parseReceiptFile(req.file.path, req.file.originalname, expenseType);
     } catch (err) {
       console.warn('Claude parse failed:', err.message);
+      parseError = err.message;
     }
 
     res.json({
       image_path: `/uploads/${req.file.filename}`,
-      parsed
+      parsed,
+      parseError
     });
   } catch (error) {
     console.error('Upload error:', error);

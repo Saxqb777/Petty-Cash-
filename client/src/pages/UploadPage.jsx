@@ -522,6 +522,7 @@ export default function UploadPage() {
     try {
       const result = await api.uploadBill(file, expenseType);
       const p = result.parsed || {};
+      if (result.parseError) setError(`Scan failed: ${result.parseError}`);
 
       if (expenseType === 'adnoc') {
         // Build auto notes from extra ADNOC fields
