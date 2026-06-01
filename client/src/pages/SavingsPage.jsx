@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingDown, Plus, Trash2, RefreshCw, Upload, X, ChevronDown, Link2 } from 'lucide-react';
+import { TrendingDown, Plus, Trash2, RefreshCw, Upload, X, ChevronDown, Link2, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { api } from '../utils/api';
 
 const fmt = (n) => new Intl.NumberFormat('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
@@ -48,46 +49,93 @@ function Sel({ value, onChange, options, placeholder = 'Select...', className = 
   );
 }
 
-// CSV import modal
-function CSVModal({ onClose, onImport }) {
-  const [csv, setCsv] = useState('');
+// Column name aliases — maps common spreadsheet headers to our field names
+const COL_MAP = {
+  date: ['date', 'clearance date', 'bill date', 'inv date'],
+  month: ['month'],
+  business_unit: ['business unit', 'bu', 'business_unit'],
+  port: ['port', 'port of entry'],
+  reference_number: ['reference', 'reference number', 'ref', 'ref no', 'reference_number', 'bl number', 'bl no'],
+  import_export: ['import/export', 'import_export', 'type', 'i/e'],
+  previous_agent: ['previous agent', 'prev agent', 'old agent', 'previous_agent', 'former agent'],
+  current_agent: ['current agent', 'new agent', 'current_agent', 'agent'],
+  old_fee: ['old fee', 'old agent fee', 'previous fee', 'old_fee', 'prev fee', 'old cost'],
+  new_fee: ['new fee', 'new agent fee', 'current fee', 'new_fee', 'new cost'],
+  savings: ['savings', 'saving', 'saved'],
+  project_name: ['project', 'project name', 'cargo', 'project_name', 'shipment'],
+  description: ['description', 'notes', 'remarks', 'details'],
+};
+
+function findCol(headers, field) {
+  const aliases = COL_MAP[field] || [];
+  return headers.findIndex(h => aliases.includes(h.toLowerCase().trim()));
+}
+
+function parseSheetRows(rows) {
+  if (!rows || rows.length < 2) return [];
+  const headers = rows[0].map(h => String(h || '').toLowerCase().trim());
+  const idx = {};
+  Object.keys(COL_MAP).forEach(f => { idx[f] = findCol(headers, f); });
+
+  return rows.slice(1).map(row => {
+    const get = (f) => idx[f] >= 0 ? String(row[idx[f]] ?? '').trim() : '';
+    const date = get('date');
+    if (!date) return null;
+    const old_fee = parseFloat(get('old_fee')) || 0;
+    const new_fee = parseFloat(get('new_fee')) || 0;
+    const savings_raw = parseFloat(get('savings'));
+    return {
+      date,
+      month:           get('month')           || null,
+      business_unit:   get('business_unit')   || null,
+      port:            get('port')            || null,
+      reference_number:get('reference_number')|| null,
+      import_export:   get('import_export')   || null,
+      previous_agent:  get('previous_agent')  || null,
+      current_agent:   get('current_agent')   || null,
+      old_fee,
+      new_fee,
+      savings:         isNaN(savings_raw) ? undefined : savings_raw,
+      project_name:    get('project_name')    || null,
+      description:     get('description')     || null,
+    };
+  }).filter(Boolean);
+}
+
+function ImportModal({ onClose, onImport }) {
+  const fileRef = useRef();
   const [preview, setPreview] = useState([]);
+  const [fileName, setFileName] = useState('');
   const [error, setError] = useState('');
   const [importing, setImporting] = useState(false);
 
-  const parseCSV = (text) => {
-    const lines = text.trim().split('\n').filter(l => l.trim());
-    const records = [];
-    lines.forEach((line, idx) => {
-      const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-      if (cols.length < 11) return;
-      const [date, month, bu, port, reference, import_export, previous_agent, current_agent, old_fee, new_fee, savings, project_name, description] = cols;
-      if (!date || isNaN(parseFloat(old_fee))) return;
-      records.push({
-        date, month: month || null, business_unit: bu || null, port: port || null,
-        reference_number: reference || null, import_export: import_export || null,
-        previous_agent: previous_agent || null, current_agent: current_agent || null,
-        old_fee: parseFloat(old_fee) || 0,
-        new_fee: parseFloat(new_fee) || 0,
-        savings: savings ? parseFloat(savings) : undefined,
-        project_name: project_name || null,
-        description: description || null,
-      });
-    });
-    return records;
-  };
-
-  const handleChange = (text) => {
-    setCsv(text);
+  const processFile = (file) => {
+    if (!file) return;
+    setFileName(file.name);
     setError('');
-    if (!text.trim()) { setPreview([]); return; }
-    const parsed = parseCSV(text);
-    setPreview(parsed);
-    if (parsed.length === 0) setError('No valid rows found. Check CSV format.');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array', cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        const parsed = parseSheetRows(rows);
+        if (!parsed.length) {
+          setError('No valid rows found. Make sure your sheet has a header row with columns like: Date, BU, Port, Previous Agent, Old Fee, New Fee…');
+          setPreview([]);
+        } else {
+          setPreview(parsed);
+        }
+      } catch (err) {
+        setError('Could not read file: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   const handleImport = async () => {
-    if (preview.length === 0) return;
+    if (!preview.length) return;
     setImporting(true);
     try {
       await onImport(preview);
@@ -99,38 +147,78 @@ function CSVModal({ onClose, onImport }) {
     }
   };
 
+  const totalSavings = preview.reduce((s, r) => s + (r.savings ?? (r.old_fee - r.new_fee)), 0);
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-auto">
         <div className="flex items-center justify-between p-5 border-b border-slate-100">
-          <h2 className="font-heading font-bold text-slate-800">Import CSV</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
-            <X className="w-5 h-5" />
-          </button>
+          <h2 className="font-heading font-bold text-slate-800">Import Savings Data</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">
-          <div>
-            <p className="text-xs text-slate-500 mb-2 font-medium">
-              Format: date, month, BU, port, reference, import/export, previous_agent, current_agent, old_fee, new_fee, savings, project_name, description
+          {/* Upload zone */}
+          <div
+            onClick={() => fileRef.current?.click()}
+            className="border-2 border-dashed border-slate-200 hover:border-brand-400 rounded-xl p-8 text-center cursor-pointer transition-colors hover:bg-brand-50/30"
+          >
+            <FileSpreadsheet className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-slate-700">
+              {fileName || 'Upload your savings spreadsheet'}
             </p>
-            <p className="text-xs text-slate-400 mb-3">
-              Example: 2026-01-15, January, AAFB, AUH, REF-001, Import, Al Bahar, AL GHARBEYA, 225, 43, 182, Project X, Container clearance
-            </p>
-            <textarea
-              className="input w-full font-mono text-xs resize-none"
-              rows={8}
-              value={csv}
-              onChange={e => handleChange(e.target.value)}
-              placeholder="Paste CSV rows here..."
+            <p className="text-xs text-slate-400 mt-1">Accepts .xlsx, .xls, .csv — any column order</p>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={e => e.target.files[0] && processFile(e.target.files[0])}
             />
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-xl">{error}</p>}
+
           {preview.length > 0 && (
-            <div className="p-3 bg-brand-50 rounded-xl text-sm text-brand-700">
-              <strong>{preview.length} record(s)</strong> ready to import.
-              Total savings: AED {fmt(preview.reduce((s, r) => s + (r.savings ?? (r.old_fee - r.new_fee)), 0))}
-            </div>
+            <>
+              <div className="p-3 bg-brand-50 rounded-xl border border-brand-100 text-sm text-brand-700 flex justify-between items-center">
+                <span><strong>{preview.length} records</strong> ready to import</span>
+                <span className="font-bold">Total savings: AED {fmt(totalSavings)}</span>
+              </div>
+
+              {/* Preview table */}
+              <div className="overflow-x-auto rounded-xl border border-slate-100">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      {['Date','BU','Port','Prev. Agent','Old Fee','Curr. Agent','New Fee','Savings'].map(h => (
+                        <th key={h} className="text-left px-3 py-2 font-semibold text-slate-500 whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {preview.slice(0, 8).map((r, i) => (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="px-3 py-1.5 text-slate-600">{r.date}</td>
+                        <td className="px-3 py-1.5 text-slate-600">{r.business_unit || '—'}</td>
+                        <td className="px-3 py-1.5 text-slate-600">{r.port || '—'}</td>
+                        <td className="px-3 py-1.5 text-slate-600">{r.previous_agent || '—'}</td>
+                        <td className="px-3 py-1.5 text-right font-mono text-slate-700">{fmt(r.old_fee)}</td>
+                        <td className="px-3 py-1.5 text-slate-600">{r.current_agent || '—'}</td>
+                        <td className="px-3 py-1.5 text-right font-mono text-slate-700">{fmt(r.new_fee)}</td>
+                        <td className="px-3 py-1.5 text-right font-mono font-bold text-emerald-700">
+                          {fmt(r.savings ?? (r.old_fee - r.new_fee))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {preview.length > 8 && (
+                  <p className="text-xs text-slate-400 text-center py-2">…and {preview.length - 8} more rows</p>
+                )}
+              </div>
+            </>
           )}
+
           <div className="flex gap-3">
             <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
             <button
@@ -140,7 +228,7 @@ function CSVModal({ onClose, onImport }) {
             >
               {importing
                 ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Importing...</>
-                : `Import ${preview.length} Record(s)`
+                : <><Upload className="w-4 h-4" /> Import {preview.length} Record{preview.length !== 1 ? 's' : ''}</>
               }
             </button>
           </div>
@@ -186,6 +274,20 @@ export default function SavingsPage() {
       .then(d => setShippingExpenses(d.records || []))
       .catch(() => {});
   }, []);
+
+  const [agentSuggestion, setAgentSuggestion] = useState(null);
+  const agentLookupTimer = useRef(null);
+
+  const lookupAgentRate = (agent, port, ie) => {
+    clearTimeout(agentLookupTimer.current);
+    if (!agent) { setAgentSuggestion(null); return; }
+    agentLookupTimer.current = setTimeout(async () => {
+      try {
+        const r = await api.getAgentRates({ previous_agent: agent, port, import_export: ie });
+        setAgentSuggestion(r.suggested_fee != null ? r.suggested_fee : null);
+      } catch { setAgentSuggestion(null); }
+    }, 500);
+  };
 
   const handleLinkExpense = (id) => {
     setLinkedExpense(id);
@@ -521,7 +623,15 @@ export default function SavingsPage() {
               </div>
               <div>
                 <label className="label">Previous Agent</label>
-                <input className="input" value={form.previous_agent} onChange={e => setF('previous_agent', e.target.value)} placeholder="e.g. Al Bahar" />
+                <input
+                  className="input"
+                  value={form.previous_agent}
+                  onChange={e => {
+                    setF('previous_agent', e.target.value);
+                    lookupAgentRate(e.target.value, form.port, form.import_export);
+                  }}
+                  placeholder="e.g. Al Bahar"
+                />
               </div>
               <div>
                 <label className="label">Current Agent</label>
@@ -530,6 +640,15 @@ export default function SavingsPage() {
               <div>
                 <label className="label">Old Fee (AED) *</label>
                 <input className="input" type="number" step="0.01" min="0" value={form.old_fee} onChange={e => setF('old_fee', e.target.value)} placeholder="225.00" />
+                {agentSuggestion != null && !form.old_fee && (
+                  <button
+                    type="button"
+                    onClick={() => setF('old_fee', String(agentSuggestion))}
+                    className="mt-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
+                  >
+                    ↑ Use AED {fmt(agentSuggestion)} from past records
+                  </button>
+                )}
               </div>
               <div>
                 <label className="label">New Fee (AED)</label>
@@ -571,7 +690,7 @@ export default function SavingsPage() {
       )}
 
       {showCSV && (
-        <CSVModal
+        <ImportModal
           onClose={() => setShowCSV(false)}
           onImport={handleBulkImport}
         />

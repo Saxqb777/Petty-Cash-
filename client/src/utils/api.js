@@ -58,4 +58,8 @@ export const api = {
   createSaving: (data) => request('/savings', { method: 'POST', body: JSON.stringify(data) }),
   bulkSavings: (records) => request('/savings/bulk', { method: 'POST', body: JSON.stringify(records) }),
   deleteSaving: (id) => request(`/savings/${id}`, { method: 'DELETE' }),
+  getAgentRates: (params = {}) => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+    return request(`/savings/agent-rates${qs ? `?${qs}` : ''}`);
+  },
 };

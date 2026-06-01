@@ -2,6 +2,29 @@ const express = require('express');
 const db = require('../db/database');
 const router = express.Router();
 
+// GET /api/savings/agent-rates — suggest old fee for a given previous agent + port + type
+router.get('/agent-rates', (req, res) => {
+  try {
+    const { previous_agent, port, import_export } = req.query;
+    if (!previous_agent) return res.json({ suggested_fee: null });
+
+    // Try exact match first (agent + port + type), then broaden
+    const queries = [
+      { sql: 'SELECT old_fee, COUNT(*) as freq FROM clearance_savings WHERE LOWER(previous_agent)=LOWER(?) AND port=? AND import_export=? GROUP BY old_fee ORDER BY freq DESC LIMIT 1', params: [previous_agent, port, import_export] },
+      { sql: 'SELECT old_fee, COUNT(*) as freq FROM clearance_savings WHERE LOWER(previous_agent)=LOWER(?) AND port=? GROUP BY old_fee ORDER BY freq DESC LIMIT 1', params: [previous_agent, port] },
+      { sql: 'SELECT old_fee, COUNT(*) as freq FROM clearance_savings WHERE LOWER(previous_agent)=LOWER(?) GROUP BY old_fee ORDER BY freq DESC LIMIT 1', params: [previous_agent] },
+    ];
+
+    for (const q of queries) {
+      const row = db.prepare(q.sql).get(...q.params.filter(p => p !== undefined && p !== ''));
+      if (row) return res.json({ suggested_fee: row.old_fee, match: 'historical' });
+    }
+    res.json({ suggested_fee: null });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/savings — paginated list with filters
 router.get('/', (req, res) => {
   try {
