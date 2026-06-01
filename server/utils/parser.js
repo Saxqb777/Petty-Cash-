@@ -183,12 +183,18 @@ async function parseReceiptFile(filePath, originalName = '', expenseType = 'gene
     ];
   }
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    system: 'You are a data extraction assistant. Always respond with valid JSON only — no explanation, no markdown, no prose before or after.',
-    messages: [{ role: 'user', content: contentBlocks }]
-  });
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Claude API timed out after 60s')), 60000)
+  );
+  const response = await Promise.race([
+    client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      system: 'You are a data extraction assistant. Always respond with valid JSON only — no explanation, no markdown, no prose before or after.',
+      messages: [{ role: 'user', content: contentBlocks }]
+    }),
+    timeout
+  ]);
 
   const rawText = response.content[0].text;
   const parsed = cleanJson(rawText);

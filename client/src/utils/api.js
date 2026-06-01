@@ -29,9 +29,14 @@ export const api = {
     const fd = new FormData();
     fd.append('bill', file);
     fd.append('expense_type', expenseType);
-    return fetch(`${BASE}/upload`, { method: 'POST', body: fd }).then(r => {
-      if (!r.ok) return r.json().then(e => { throw new Error(e.error); });
-      return r.json();
+    return fetch(`${BASE}/upload`, { method: 'POST', body: fd }).then(async r => {
+      const text = await r.text();
+      let json;
+      try { json = JSON.parse(text); } catch (_) {
+        throw new Error('Server returned an invalid response — check server is running');
+      }
+      if (!r.ok) throw new Error(json.error || 'Upload failed');
+      return json;
     });
   },
 
