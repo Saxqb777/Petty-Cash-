@@ -65,7 +65,7 @@ export default function Sidebar() {
       <div className="px-5 py-4 border-t border-white/[0.06] space-y-1">
         <p className="text-white/20 text-[11px]">© 2026 Agthia Group</p>
         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-brand-500/10 border border-brand-500/20 rounded text-brand-400 text-[10px] font-mono font-medium">
-          v1.3.4
+          v1.3.5
         </span>
       </div>
     </aside>
