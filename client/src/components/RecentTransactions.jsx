@@ -2,36 +2,28 @@ import { useNavigate } from 'react-router-dom';
 import { Fuel, Car, FileText, Package, UtensilsCrossed, Printer, Briefcase, Plane, Heart, MoreHorizontal } from 'lucide-react';
 
 const CATEGORY_ICONS = {
-  'Fuel & Transport': Fuel,
-  'Parking': Car,
-  'Customs & Clearance': FileText,
-  'Materials & Supplies': Package,
-  'Food & Beverages': UtensilsCrossed,
-  'Printing & Photocopy': Printer,
-  'Office Supplies': Briefcase,
-  'Accommodation & Travel': Plane,
-  'Medical': Heart,
-  'Miscellaneous': MoreHorizontal
+  'Fuel & Transport': Fuel, 'Parking': Car, 'Customs & Clearance': FileText,
+  'Materials & Supplies': Package, 'Food & Beverages': UtensilsCrossed,
+  'Printing & Photocopy': Printer, 'Office Supplies': Briefcase,
+  'Accommodation & Travel': Plane, 'Medical': Heart, 'Miscellaneous': MoreHorizontal
 };
 
 const CATEGORY_COLORS = {
-  'Fuel & Transport': 'bg-orange-100 text-orange-600',
-  'Parking': 'bg-blue-100 text-blue-600',
-  'Customs & Clearance': 'bg-purple-100 text-purple-600',
-  'Materials & Supplies': 'bg-yellow-100 text-yellow-600',
-  'Food & Beverages': 'bg-pink-100 text-pink-600',
-  'Printing & Photocopy': 'bg-cyan-100 text-cyan-600',
-  'Office Supplies': 'bg-indigo-100 text-indigo-600',
-  'Accommodation & Travel': 'bg-sky-100 text-sky-600',
-  'Medical': 'bg-red-100 text-red-600',
-  'Miscellaneous': 'bg-gray-100 text-gray-600'
+  'Fuel & Transport':      'bg-orange-100 text-orange-500',
+  'Parking':               'bg-blue-100 text-blue-500',
+  'Customs & Clearance':   'bg-purple-100 text-purple-500',
+  'Materials & Supplies':  'bg-yellow-100 text-yellow-600',
+  'Food & Beverages':      'bg-pink-100 text-pink-500',
+  'Printing & Photocopy':  'bg-cyan-100 text-cyan-600',
+  'Office Supplies':       'bg-indigo-100 text-indigo-500',
+  'Accommodation & Travel':'bg-sky-100 text-sky-500',
+  'Medical':               'bg-red-100 text-red-500',
+  'Miscellaneous':         'bg-slate-100 text-slate-500'
 };
 
-const fmt = (n) => new Intl.NumberFormat('en-AE', { minimumFractionDigits: 2 }).format(n);
 const fmtDate = (d) => {
-  if (!d) return '-';
-  const date = new Date(d + 'T00:00:00');
-  return date.toLocaleDateString('en-AE', { day: '2-digit', month: 'short', year: 'numeric' });
+  if (!d) return '';
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-AE', { day: '2-digit', month: 'short' });
 };
 
 export default function RecentTransactions({ transactions = [] }) {
@@ -39,33 +31,41 @@ export default function RecentTransactions({ transactions = [] }) {
 
   if (!transactions.length) {
     return (
-      <div className="text-center py-10 text-gray-400 text-sm">
-        No transactions yet. <button onClick={() => navigate('/upload')} className="text-brand-600 hover:underline">Add one →</button>
+      <div className="text-center py-8 text-slate-400 text-sm">
+        No transactions yet.{' '}
+        <button onClick={() => navigate('/upload')} className="text-brand-600 hover:text-brand-700 font-semibold">
+          Add one →
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="divide-y divide-gray-50">
-      {transactions.map(tx => {
-        const Icon = CATEGORY_ICONS[tx.category] || MoreHorizontal;
-        const colorClass = CATEGORY_COLORS[tx.category] || 'bg-gray-100 text-gray-600';
+    <div className="space-y-1">
+      {transactions.map((tx, i) => {
+        const Icon       = CATEGORY_ICONS[tx.category] || MoreHorizontal;
+        const colorClass = CATEGORY_COLORS[tx.category] || 'bg-slate-100 text-slate-500';
+        const amount     = new Intl.NumberFormat('en-AE', { minimumFractionDigits: 2 }).format(tx.amount);
         return (
           <div
             key={tx.id}
             onClick={() => navigate('/records')}
-            className="flex items-center gap-4 py-3 px-1 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors group"
+            style={{ animationDelay: `${i * 40}ms` }}
+            className="flex items-center gap-3.5 px-3 py-2.5 rounded-xl hover:bg-slate-50 cursor-pointer transition-all duration-150 group fade-in"
           >
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${colorClass}`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${colorClass} group-hover:scale-105 transition-transform duration-150`}>
               <Icon className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-800 truncate">{tx.vendor_name || 'Unknown'}</p>
-              <p className="text-xs text-gray-400 truncate">{tx.purpose || tx.category} {tx.business_unit ? `· ${tx.business_unit}` : ''}</p>
+              <p className="text-[13.5px] font-semibold text-slate-800 truncate leading-tight">{tx.vendor_name || 'Unknown'}</p>
+              <p className="text-xs text-slate-400 truncate mt-0.5">
+                {tx.purpose || tx.category}
+                {tx.business_unit ? <span className="ml-1.5 text-brand-500 font-medium">{tx.business_unit}</span> : null}
+              </p>
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="text-sm font-bold text-gray-900">AED {fmt(tx.amount)}</p>
-              <p className="text-xs text-gray-400">{fmtDate(tx.date)}</p>
+              <p className="text-[13.5px] font-bold text-slate-800">AED {amount}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{fmtDate(tx.date)}</p>
             </div>
           </div>
         );

@@ -1,47 +1,58 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Upload, FileText, TrendingUp, Wallet } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Table2, Settings, TrendingUp } from 'lucide-react';
 
 const nav = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/upload', icon: Upload, label: 'Add Expense' },
-  { to: '/records', icon: FileText, label: 'Records' },
+  { to: '/',        icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/upload',  icon: PlusCircle,      label: 'Add Expense' },
+  { to: '/records', icon: Table2,          label: 'Records' },
+  { to: '/settings',icon: Settings,        label: 'Settings' },
 ];
 
 export default function Sidebar() {
   return (
-    <aside className="w-60 bg-brand-900 min-h-screen flex flex-col flex-shrink-0">
+    <aside className="w-64 min-h-screen flex flex-col flex-shrink-0 bg-[#0d1117] border-r border-white/[0.06]">
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-brand-800">
+      <div className="px-5 pt-6 pb-5 border-b border-white/[0.06]">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center shadow-sm">
-            <Wallet className="w-5 h-5 text-white" />
+          <div className="relative w-10 h-10">
+            <div className="absolute inset-0 bg-brand-500 rounded-xl opacity-20 blur-sm" />
+            <div className="relative w-10 h-10 bg-gradient-to-br from-brand-400 to-brand-600 rounded-xl flex items-center justify-center shadow-glow-sm">
+              <TrendingUp className="w-5 h-5 text-white" />
+            </div>
           </div>
           <div>
-            <p className="text-white font-bold text-base leading-tight tracking-tight">Agthia</p>
-            <p className="text-brand-400 text-xs font-medium tracking-wide">Petty Cash</p>
+            <p className="text-white font-bold text-[15px] leading-tight font-heading tracking-tight">Agthia</p>
+            <p className="text-brand-400 text-[11px] font-medium tracking-widest uppercase">Petty Cash</p>
           </div>
         </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-5 space-y-0.5">
-        <p className="text-brand-600 text-xs font-semibold uppercase tracking-widest px-3 mb-3">Menu</p>
+        <p className="text-white/20 text-[10px] font-bold uppercase tracking-[0.15em] px-3 mb-3">Menu</p>
         {nav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+              `relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-200 group ${
                 isActive
-                  ? 'bg-brand-700 text-white shadow-sm'
-                  : 'text-brand-300 hover:bg-brand-800 hover:text-white'
+                  ? 'bg-white/[0.08] text-white'
+                  : 'text-white/40 hover:bg-white/[0.04] hover:text-white/80'
               }`
             }
           >
             {({ isActive }) => (
               <>
-                <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-brand-300' : ''}`} />
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-brand-400 rounded-r-full" />
+                )}
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
+                  isActive ? 'bg-brand-500/20' : 'group-hover:bg-white/[0.06]'
+                }`}>
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-brand-400' : ''}`} />
+                </div>
                 {label}
               </>
             )}
@@ -50,11 +61,8 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t border-brand-800">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="w-3.5 h-3.5 text-brand-500" />
-          <p className="text-brand-500 text-xs">© 2026 Agthia Group</p>
-        </div>
+      <div className="px-5 py-4 border-t border-white/[0.06]">
+        <p className="text-white/20 text-[11px]">© 2026 Agthia Group</p>
       </div>
     </aside>
   );

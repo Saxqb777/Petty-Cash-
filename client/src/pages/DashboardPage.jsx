@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Calendar, Tag, BarChart2, Plus, RefreshCw } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { DollarSign, Calendar, Tag, BarChart2, Plus, RefreshCw, ArrowRight } from 'lucide-react';
 import StatsCard from '../components/StatsCard';
 import CategoryDonutChart from '../components/CategoryDonutChart';
 import MonthlyBarChart from '../components/MonthlyBarChart';
@@ -10,8 +11,17 @@ import { api } from '../utils/api';
 const fmt = (n) => new Intl.NumberFormat('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 
 function Skeleton({ className = '' }) {
-  return <div className={`bg-gray-100 animate-pulse rounded-lg ${className}`} />;
+  return <div className={`skeleton ${className}`} />;
 }
+
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07 } }
+};
+const item = {
+  hidden: { opacity: 0, y: 16 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] } }
+};
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -20,16 +30,10 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
 
   const load = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await api.getDashboard();
-      setStats(data);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true); setError('');
+    try { setStats(await api.getDashboard()); }
+    catch (e) { setError(e.message); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
@@ -39,43 +43,50 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="flex items-center justify-between mb-7"
+      >
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{monthName} · Petty Cash Overview</p>
+          <h1 className="text-2xl font-heading font-bold text-slate-900 tracking-tight">Dashboard</h1>
+          <p className="text-sm text-slate-400 mt-0.5 font-medium">{monthName}</p>
         </div>
         <div className="flex gap-2">
           <button onClick={load} className="btn-secondary flex items-center gap-2 text-sm">
-            <RefreshCw className="w-3.5 h-3.5" />
-            Refresh
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </button>
           <button onClick={() => navigate('/upload')} className="btn-primary flex items-center gap-2 text-sm">
-            <Plus className="w-4 h-4" />
-            Add Expense
+            <Plus className="w-4 h-4" /> Add Expense
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">
-          {error}
-        </div>
+        <div className="mb-5 p-4 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">{error}</div>
       )}
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)
-        ) : (
-          <>
+      {/* Hero + secondary stats */}
+      {loading ? (
+        <div className="grid grid-cols-4 gap-4 mb-5">
+          <Skeleton className="col-span-2 h-36" />
+          {[0,1].map(i => <Skeleton key={i} className="h-36" />)}
+        </div>
+      ) : (
+        <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-4 gap-4 mb-5">
+          <motion.div variants={item} className="col-span-2">
             <StatsCard
-              title="Total Spent"
+              title="Total Petty Cash Spent"
               value={`AED ${fmt(stats?.totalSpent)}`}
-              sub={`${stats?.totalCount || 0} transactions`}
+              sub={`${stats?.totalCount || 0} transactions across all time`}
               icon={DollarSign}
-              accent
+              variant="green"
             />
+          </motion.div>
+          <motion.div variants={item}>
             <StatsCard
               title="This Month"
               value={`AED ${fmt(stats?.thisMonthTotal)}`}
@@ -83,51 +94,67 @@ export default function DashboardPage() {
               icon={Calendar}
               trend={stats?.monthChange}
               trendLabel="vs last month"
+              variant="blue"
             />
-            <StatsCard
-              title="Top Category"
-              value={stats?.topCategory?.category || '—'}
-              sub={stats?.topCategory ? `AED ${fmt(stats.topCategory.total)}` : 'No data'}
-              icon={Tag}
-            />
+          </motion.div>
+          <motion.div variants={item}>
             <StatsCard
               title="Avg Transaction"
               value={`AED ${fmt(stats?.avgTransaction)}`}
               sub="Per expense entry"
               icon={BarChart2}
+              variant="violet"
             />
-          </>
-        )}
-      </div>
+          </motion.div>
+        </motion.div>
+      )}
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
-        {/* Monthly Trend */}
-        <div className="card p-5 lg:col-span-3">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">Monthly Spend Trend</h2>
-          {loading ? <Skeleton className="h-48" /> : <MonthlyBarChart data={stats?.monthlyTrend || []} />}
-        </div>
+      <motion.div
+        variants={container} initial="hidden" animate="show"
+        className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5"
+      >
+        <motion.div variants={item} className="card p-5 lg:col-span-3">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="text-[15px] font-heading font-bold text-slate-800">Monthly Spend</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Last 6 months</p>
+            </div>
+          </div>
+          {loading ? <Skeleton className="h-52" /> : <MonthlyBarChart data={stats?.monthlyTrend || []} />}
+        </motion.div>
 
-        {/* Category Breakdown */}
-        <div className="card p-5 lg:col-span-2">
-          <h2 className="text-sm font-semibold text-gray-700 mb-2">By Category</h2>
-          {loading ? <Skeleton className="h-48" /> : <CategoryDonutChart data={stats?.categoryBreakdown || []} />}
-        </div>
-      </div>
+        <motion.div variants={item} className="card p-5 lg:col-span-2">
+          <div className="mb-4">
+            <h2 className="text-[15px] font-heading font-bold text-slate-800">By Category</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Spend distribution</p>
+          </div>
+          {loading ? <Skeleton className="h-52" /> : <CategoryDonutChart data={stats?.categoryBreakdown || []} />}
+        </motion.div>
+      </motion.div>
 
       {/* Recent Transactions */}
-      <div className="card p-5">
+      <motion.div
+        variants={item} initial="hidden" animate="show"
+        className="card p-5"
+      >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-700">Recent Transactions</h2>
-          <button onClick={() => navigate('/records')} className="text-xs text-brand-600 hover:text-brand-700 font-medium">
-            View all →
+          <div>
+            <h2 className="text-[15px] font-heading font-bold text-slate-800">Recent Transactions</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Latest expense activity</p>
+          </div>
+          <button
+            onClick={() => navigate('/records')}
+            className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-semibold transition-colors"
+          >
+            View all <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
         {loading
-          ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 mb-2" />)
+          ? <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
           : <RecentTransactions transactions={stats?.recentTransactions || []} />
         }
-      </div>
+      </motion.div>
     </div>
   );
 }
