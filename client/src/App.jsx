@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from './components/Sidebar';
+import ErrorBoundary from './components/ErrorBoundary';
+import { ToastProvider } from './components/Toast';
 import DashboardPage from './pages/DashboardPage';
 import UploadPage from './pages/UploadPage';
 import RecordsPage from './pages/RecordsPage';
@@ -38,13 +40,17 @@ function AnimatedRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <div className="flex min-h-screen bg-[#f1f5f9]">
-        <Sidebar />
-        <main className="flex-1 overflow-auto">
-          <AnimatedRoutes />
-        </main>
-      </div>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <ToastProvider>
+        <BrowserRouter>
+          <div className="flex min-h-screen bg-[#f1f5f9]">
+            <Sidebar />
+            <main className="flex-1 overflow-auto">
+              <AnimatedRoutes />
+            </main>
+          </div>
+        </BrowserRouter>
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }

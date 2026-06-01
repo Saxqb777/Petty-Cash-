@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingDown, Plus, Trash2, RefreshCw, Upload, X, ChevronDown, Link2, FileSpreadsheet } from 'lucide-react';
+import { TrendingDown, Plus, Trash2, Upload, X, ChevronDown, Link2, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { api } from '../utils/api';
+import { useToast } from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const fmt = (n) => new Intl.NumberFormat('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 
@@ -239,6 +241,8 @@ function ImportModal({ onClose, onImport }) {
 }
 
 export default function SavingsPage() {
+  const toast = useToast();
+
   const [tab, setTab] = useState('records');
   const [summary, setSummary] = useState(null);
   const [records, setRecords] = useState([]);
@@ -247,6 +251,7 @@ export default function SavingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCSV, setShowCSV] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   // Filters
   const [filterBU, setFilterBU] = useState('');
@@ -258,7 +263,6 @@ export default function SavingsPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
-  const [formSuccess, setFormSuccess] = useState(false);
   const [shippingExpenses, setShippingExpenses] = useState([]);
   const [linkedExpense, setLinkedExpense] = useState('');
 
@@ -344,12 +348,14 @@ export default function SavingsPage() {
   useEffect(() => { loadRecords(); }, [page, filterBU, filterIE, filterFrom, filterTo]);
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this savings record?')) return;
     try {
       await api.deleteSaving(id);
+      toast.success('Savings record deleted');
       await Promise.all([loadSummary(), loadRecords()]);
     } catch (e) {
-      setError(e.message);
+      toast.error(e.message);
+    } finally {
+      setConfirmDelete(null);
     }
   };
 
@@ -362,10 +368,9 @@ export default function SavingsPage() {
         old_fee: parseFloat(form.old_fee) || 0,
         new_fee: parseFloat(form.new_fee) || 0,
       });
-      setFormSuccess(true);
+      toast.success('Savings record saved');
       setForm(EMPTY_FORM);
       setLinkedExpense('');
-      setTimeout(() => setFormSuccess(false), 2500);
       await Promise.all([loadSummary(), loadRecords()]);
       setTab('records');
     } catch (e) {
@@ -377,6 +382,7 @@ export default function SavingsPage() {
 
   const handleBulkImport = async (rows) => {
     await api.bulkSavings(rows);
+    toast.success(`${rows.length} record${rows.length !== 1 ? 's' : ''} imported`);
     await Promise.all([loadSummary(), loadRecords()]);
   };
 
@@ -510,7 +516,7 @@ export default function SavingsPage() {
                         <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700">{fmt(r.savings)}</td>
                         <td className="px-3 py-2.5 text-slate-500 text-xs max-w-[160px] truncate">{r.description || '—'}</td>
                         <td className="px-3 py-2.5">
-                          <button onClick={() => handleDelete(r.id)} className="text-slate-300 hover:text-red-500 transition-colors">
+                          <button onClick={() => setConfirmDelete(r.id)} className="text-slate-300 hover:text-red-500 transition-colors">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </td>
@@ -557,7 +563,6 @@ export default function SavingsPage() {
             <h2 className="font-heading font-bold text-slate-800 mb-5">New Savings Record</h2>
 
             {formError && <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">{formError}</div>}
-            {formSuccess && <div className="mb-4 p-3 bg-brand-50 border border-brand-100 rounded-xl text-sm text-brand-700">Record saved successfully.</div>}
 
             {/* Link to existing shipping expense */}
             {shippingExpenses.length > 0 && (
@@ -695,6 +700,15 @@ export default function SavingsPage() {
           onImport={handleBulkImport}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title="Delete Savings Record"
+        message="This will permanently remove this savings record. This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => handleDelete(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

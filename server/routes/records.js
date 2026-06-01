@@ -30,7 +30,7 @@ const parseRecord = (r) => {
 // GET all records with optional filters
 router.get('/', (req, res) => {
   try {
-    const { from, to, category, business_unit, expense_type, search, page = 1, limit = 50 } = req.query;
+    const { from, to, category, business_unit, expense_type, search, page = 1, limit = 50, sort_by, sort_dir } = req.query;
     let query = 'SELECT * FROM expenses WHERE 1=1';
     const params = [];
 
@@ -44,7 +44,10 @@ router.get('/', (req, res) => {
       params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
-    query += ' ORDER BY date DESC, created_at DESC';
+    const ALLOWED_SORT = { date: 'date', amount_aed: 'COALESCE(amount_aed,amount)', vendor_name: 'vendor_name', category: 'category', business_unit: 'business_unit' };
+    const sortCol = ALLOWED_SORT[sort_by] || 'date';
+    const sortDir = sort_dir === 'asc' ? 'ASC' : 'DESC';
+    query += ` ORDER BY ${sortCol} ${sortDir}, created_at DESC`;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const total = db.prepare(query.replace('SELECT *', 'SELECT COUNT(*) as total')).get(...params)?.total || 0;
     query += ` LIMIT ? OFFSET ?`;
@@ -77,16 +80,36 @@ router.post('/', (req, res) => {
       line_items = [], notes, image_path,
       bl_number, container_number, port, shipment_type,
       container_numbers = [], bl_numbers = [],
-      // Savings fields — only for shipping bills
       savings_old_fee, savings_previous_agent, savings_record = false,
     } = req.body;
 
+    // Required field validation
     if (!vendor_name || !amount || !date || !category) {
       return res.status(400).json({ error: 'vendor_name, amount, date, and category are required' });
     }
 
+    // Type validation
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount < 0) {
+      return res.status(400).json({ error: 'amount must be a positive number' });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: 'date must be in YYYY-MM-DD format' });
+    }
+
+    // Sanitize strings
+    const clean = (s, max = 500) => (s || '').toString().trim().slice(0, max) || null;
+
+    // Duplicate detection — same invoice + vendor + amount + date
+    if (invoice_number) {
+      const dupe = db.prepare(
+        'SELECT id FROM expenses WHERE invoice_number=? AND vendor_name=? AND date=? AND amount=?'
+      ).get(invoice_number, vendor_name, date, parsedAmount);
+      if (dupe) return res.status(409).json({ error: `Duplicate: this bill was already recorded (Record #${dupe.id})`, existingId: dupe.id });
+    }
+
     const rate = getRate(currency);
-    const amount_aed = parseFloat(amount) * rate;
+    const amount_aed = parsedAmount * rate;
 
     const doInsert = db.transaction(() => {
       const result = db.prepare(`
@@ -96,9 +119,9 @@ router.post('/', (req, res) => {
           amount_aed, exchange_rate, container_numbers, bl_numbers)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        expense_type, invoice_number || null, vendor_name, parseFloat(amount), currency, date,
-        category, business_unit || null, payment_method, purpose || null, submitted_by || null,
-        JSON.stringify(line_items), notes || null, image_path || null,
+        clean(expense_type, 50) || 'general', clean(invoice_number, 100), clean(vendor_name, 255), parsedAmount, clean(currency, 10) || 'AED', date,
+        clean(category, 100), clean(business_unit, 50), clean(payment_method, 50) || 'Cash', clean(purpose), clean(submitted_by, 100),
+        JSON.stringify(line_items), clean(notes, 1000), image_path || null,
         bl_number || null, container_number || null, port || null, shipment_type || null,
         amount_aed, rate,
         JSON.stringify(Array.isArray(container_numbers) ? container_numbers : []),

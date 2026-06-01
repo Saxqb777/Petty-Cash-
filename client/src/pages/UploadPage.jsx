@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   Upload, FileText, X, CheckCircle, AlertCircle,
   ChevronDown, PenLine, Scan, Fuel, Ship, LayoutGrid,
-  Plus, Trash2, ArrowLeft, MapPin, PiggyBank, TrendingUp
+  Plus, Trash2, ArrowLeft, MapPin, PiggyBank
 } from 'lucide-react';
 import { api } from '../utils/api';
+import { useToast } from '../components/Toast';
 
 const CATEGORIES = [
   'Fuel & Transport', 'Parking', 'Customs & Clearance', 'Printing & Photocopy',
@@ -442,6 +443,8 @@ function GeneralForm({ form, set, rates }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function UploadPage() {
   const navigate = useNavigate();
+  const toast = useToast();
+
   const [expenseType, setExpenseType] = useState(null);
   const [inputMode, setInputMode] = useState('upload'); // 'upload' | 'manual'
   const [dragOver, setDragOver] = useState(false);
@@ -449,7 +452,6 @@ export default function UploadPage() {
   const [preview, setPreview] = useState(null);
   const [fileName, setFileName] = useState('');
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [stage, setStage] = useState('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -608,7 +610,7 @@ export default function UploadPage() {
       }
       setStage('extracted');
     } catch (e) {
-      setError(`Upload failed: ${e.message}`);
+      toast.error(`Upload failed: ${e.message}`);
       setPreview(null);
     } finally {
       clearInterval(progressRef.current);
@@ -658,10 +660,14 @@ export default function UploadPage() {
     setSaving(true);
     try {
       await api.createRecord(payload);
-      setSaved(true);
-      setTimeout(() => navigate('/records'), 1200);
+      toast.success('Expense saved successfully!');
+      setTimeout(() => navigate('/records'), 900);
     } catch (e) {
-      setError(e.message);
+      if (e.message?.includes('Duplicate')) {
+        toast.error(e.message);
+      } else {
+        setError(e.message);
+      }
     } finally {
       setSaving(false);
     }
@@ -669,7 +675,7 @@ export default function UploadPage() {
 
   const reset = () => {
     setExpenseType(null); setInputMode('upload'); setPreview(null); setFileName('');
-    setStage('idle'); setSaved(false); setError('');
+    setStage('idle'); setError('');
     setAdnocForm(EMPTY_ADNOC); setShippingForm(EMPTY_SHIPPING); setGeneralForm(EMPTY_GENERAL);
     setShippingCharges(SHIPPING_CHARGES.map(label => ({ label, amount: '' })));
     setShippingBLs([]); setShippingContainers([]);
@@ -754,11 +760,6 @@ export default function UploadPage() {
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-sm text-red-600">
           <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
-        </div>
-      )}
-      {saved && (
-        <div className="mb-4 p-3 bg-brand-50 border border-brand-100 rounded-xl flex items-center gap-3 text-sm text-brand-700">
-          <CheckCircle className="w-4 h-4" /> Saved! Redirecting to records...
         </div>
       )}
 

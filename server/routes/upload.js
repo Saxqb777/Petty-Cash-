@@ -6,11 +6,12 @@ const { parseReceiptFile } = require('../utils/parser');
 
 const router = express.Router();
 
+const UPLOADS_DIR = path.join(__dirname, '../../uploads');
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadsDir = path.join(__dirname, '../../uploads');
-    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-    cb(null, uploadsDir);
+    if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    cb(null, UPLOADS_DIR);
   },
   filename: (req, file, cb) => {
     const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
@@ -35,6 +36,23 @@ const FALLBACK = {
   payment_method: 'Cash', purpose: '', submitted_by: null,
   line_items: [], notes: null, invoice_number: null
 };
+
+// Clean up uploaded files older than 7 days
+function cleanOldUploads() {
+  try {
+    const files = fs.readdirSync(UPLOADS_DIR);
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    files.forEach(f => {
+      if (f === '.gitkeep') return;
+      const fp = path.join(UPLOADS_DIR, f);
+      const stat = fs.statSync(fp);
+      if (stat.mtimeMs < cutoff) fs.unlinkSync(fp);
+    });
+  } catch (_) {}
+}
+
+// Run cleanup once a day
+setInterval(cleanOldUploads, 24 * 60 * 60 * 1000);
 
 router.post('/', (req, res, next) => {
   upload.single('bill')(req, res, (err) => {

@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Search, Download, Trash2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
-  FileText, Filter, X, Edit2, CheckCircle, AlertCircle, Plus, Ship, Fuel, Receipt
+  FileText, Filter, X, Edit2, AlertCircle, Plus, Ship, Fuel, Receipt, ArrowUpDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
+import { useToast } from '../components/Toast';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const CATEGORIES = [
   'Fuel & Transport', 'Parking', 'Customs & Clearance', 'Printing & Photocopy',
@@ -15,9 +17,9 @@ const CATEGORIES = [
 const BUS = ['AAFB', 'Al Foah', 'GMFF', 'BMB', 'Other'];
 
 const EXPENSE_TYPE_META = {
-  adnoc: { label: 'Petrol & Fuel', icon: Fuel, color: 'bg-orange-100 text-orange-700' },
-  shipping: { label: 'Shipping Bill', icon: Ship, color: 'bg-blue-100 text-blue-700' },
-  general: { label: 'General', icon: Receipt, color: 'bg-gray-100 text-gray-600' },
+  adnoc:    { label: 'Petrol & Fuel',  icon: Fuel,    color: 'bg-orange-100 text-orange-700' },
+  shipping: { label: 'Shipping Bill',  icon: Ship,    color: 'bg-blue-100 text-blue-700' },
+  general:  { label: 'General',        icon: Receipt, color: 'bg-gray-100 text-gray-600' },
 };
 
 const fmt = (n) => new Intl.NumberFormat('en-AE', { minimumFractionDigits: 2 }).format(n || 0);
@@ -27,24 +29,31 @@ const fmtDate = (d) => {
 };
 
 const CATEGORY_COLORS = {
-  'Fuel & Transport': 'bg-orange-100 text-orange-700',
-  'Parking': 'bg-blue-100 text-blue-700',
-  'Customs & Clearance': 'bg-purple-100 text-purple-700',
-  'Materials & Supplies': 'bg-yellow-100 text-yellow-700',
-  'Food & Beverages': 'bg-pink-100 text-pink-700',
-  'Printing & Photocopy': 'bg-cyan-100 text-cyan-700',
-  'Office Supplies': 'bg-indigo-100 text-indigo-700',
+  'Fuel & Transport':       'bg-orange-100 text-orange-700',
+  'Parking':                'bg-blue-100 text-blue-700',
+  'Customs & Clearance':    'bg-purple-100 text-purple-700',
+  'Materials & Supplies':   'bg-yellow-100 text-yellow-700',
+  'Food & Beverages':       'bg-pink-100 text-pink-700',
+  'Printing & Photocopy':   'bg-cyan-100 text-cyan-700',
+  'Office Supplies':        'bg-indigo-100 text-indigo-700',
   'Accommodation & Travel': 'bg-sky-100 text-sky-700',
-  'Medical': 'bg-red-100 text-red-700',
-  'Miscellaneous': 'bg-gray-100 text-gray-600'
+  'Medical':                'bg-red-100 text-red-700',
+  'Miscellaneous':          'bg-gray-100 text-gray-600'
 };
 
+// ─── Export Modal ─────────────────────────────────────────────────────────────
 function ExportModal({ onClose }) {
-  const [type, setType] = useState('all');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [type, setType]         = useState('all');
+  const [from, setFrom]         = useState('');
+  const [to, setTo]             = useState('');
   const [category, setCategory] = useState('');
-  const [bu, setBu] = useState('');
+  const [bu, setBu]             = useState('');
+
+  useEffect(() => {
+    const handle = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handle);
+    return () => document.removeEventListener('keydown', handle);
+  }, [onClose]);
 
   const doExport = () => {
     const url = api.exportUrl({ type, from: type === 'custom' ? from : '', to: type === 'custom' ? to : '', category, business_unit: bu });
@@ -54,7 +63,7 @@ function ExportModal({ onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 slide-up">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-slide-up">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-bold text-gray-900">Export to Excel</h3>
           <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center">
@@ -105,19 +114,28 @@ function ExportModal({ onClose }) {
   );
 }
 
+// ─── Edit Modal ────────────────────────────────────────────────────────────────
 function EditModal({ record, onClose, onSave }) {
+  const toast = useToast();
   const [form, setForm] = useState({ ...record, line_items: undefined });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    const handle = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handle);
+    return () => document.removeEventListener('keydown', handle);
+  }, [onClose]);
 
   const save = async () => {
     setSaving(true);
     try {
       await api.updateRecord(record.id, form);
+      toast.success('Expense updated');
       onSave();
       onClose();
     } catch (e) {
-      alert(e.message);
+      toast.error(e.message);
     } finally {
       setSaving(false);
     }
@@ -125,14 +143,14 @@ function EditModal({ record, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 slide-up">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 animate-slide-up">
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-bold text-gray-900">Edit Expense</h3>
           <button onClick={onClose} className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center"><X className="w-4 h-4" /></button>
         </div>
         <div className="grid grid-cols-2 gap-4">
           {[
-            { k: 'vendor_name', l: 'Vendor', placeholder: 'e.g. ADNOC' },
+            { k: 'vendor_name',    l: 'Vendor',      placeholder: 'e.g. ADNOC' },
             { k: 'invoice_number', l: 'Invoice No.', placeholder: 'Receipt #' },
           ].map(({ k, l, placeholder }) => (
             <div key={k}>
@@ -191,69 +209,103 @@ function EditModal({ record, onClose, onSave }) {
   );
 }
 
-export default function RecordsPage() {
-  const navigate = useNavigate();
-  const [records, setRecords] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pages, setPages] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
+// ─── Sortable column header ────────────────────────────────────────────────────
+function SortTh({ label, field, sortBy, sortDir, onSort, className = '' }) {
+  const active = sortBy === field;
+  return (
+    <th
+      onClick={() => field && onSort(field)}
+      className={`text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap select-none
+        ${field ? 'cursor-pointer hover:text-gray-700 hover:bg-gray-100 transition-colors' : ''} ${className}`}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {field && (
+          active
+            ? (sortDir === 'desc'
+                ? <ChevronDown className="w-3 h-3 text-brand-500" />
+                : <ChevronUp className="w-3 h-3 text-brand-500" />)
+            : <ArrowUpDown className="w-3 h-3 opacity-25" />
+        )}
+      </span>
+    </th>
+  );
+}
 
-  const [search, setSearch] = useState('');
-  const [filterCat, setFilterCat] = useState('');
-  const [filterBU, setFilterBU] = useState('');
+// ─── Main Page ─────────────────────────────────────────────────────────────────
+export default function RecordsPage() {
+  const navigate  = useNavigate();
+  const toast     = useToast();
+
+  const [records, setRecords] = useState([]);
+  const [total,   setTotal]   = useState(0);
+  const [page,    setPage]    = useState(1);
+  const [pages,   setPages]   = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
+
+  const [search,     setSearch]     = useState('');
+  const [filterCat,  setFilterCat]  = useState('');
+  const [filterBU,   setFilterBU]   = useState('');
   const [filterFrom, setFilterFrom] = useState('');
-  const [filterTo, setFilterTo] = useState('');
+  const [filterTo,   setFilterTo]   = useState('');
   const [filterType, setFilterType] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  const [expanded, setExpanded] = useState(null);
-  const [showExport, setShowExport] = useState(false);
-  const [editRecord, setEditRecord] = useState(null);
-  const [deleting, setDeleting] = useState(null);
+  const [sortBy,  setSortBy]  = useState('date');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const [expanded,      setExpanded]      = useState(null);
+  const [showExport,    setShowExport]    = useState(false);
+  const [editRecord,    setEditRecord]    = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deleting,      setDeleting]      = useState(null);
+
+  const handleSort = (field) => {
+    if (sortBy === field) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    else { setSortBy(field); setSortDir('desc'); }
+    setPage(1);
+  };
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
       const data = await api.getRecords({
         search, category: filterCat, business_unit: filterBU,
-        from: filterFrom, to: filterTo, expense_type: filterType, page, limit: 20
+        from: filterFrom, to: filterTo, expense_type: filterType,
+        page, limit: 20, sort_by: sortBy, sort_dir: sortDir
       });
       setRecords(data.records); setTotal(data.total);
       setPage(data.page); setPages(data.pages);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
-  }, [search, filterCat, filterBU, filterFrom, filterTo, filterType, page]);
+  }, [search, filterCat, filterBU, filterFrom, filterTo, filterType, page, sortBy, sortDir]);
 
   useEffect(() => { load(); }, [load]);
-
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
   const handleDelete = async (id) => {
     setDeleting(id);
     try {
       await api.deleteRecord(id);
-      showToast('Expense deleted');
+      toast.success('Expense deleted');
       load();
-    } catch (e) { setError(e.message); }
-    finally { setDeleting(null); }
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setDeleting(null);
+      setConfirmDelete(null);
+    }
   };
 
-  const clearFilters = () => { setSearch(''); setFilterCat(''); setFilterBU(''); setFilterFrom(''); setFilterTo(''); setFilterType(''); setPage(1); };
+  const clearFilters = () => {
+    setSearch(''); setFilterCat(''); setFilterBU('');
+    setFilterFrom(''); setFilterTo(''); setFilterType(''); setPage(1);
+  };
   const hasFilters = search || filterCat || filterBU || filterFrom || filterTo || filterType;
   const totalAmt = records.reduce((s, r) => s + (r.amount_aed || r.amount || 0), 0);
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      {/* Toast */}
-      {toast && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-xl shadow-xl fade-in">
-          <CheckCircle className="w-4 h-4 text-brand-400" /> {toast}
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -296,7 +348,7 @@ export default function RecordsPage() {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3 pt-3 border-t border-gray-100 fade-in">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3 pt-3 border-t border-gray-100 animate-fade-in">
             <div>
               <label className="label">Type</label>
               <select className="input" value={filterType} onChange={e => { setFilterType(e.target.value); setPage(1); }}>
@@ -348,9 +400,14 @@ export default function RecordsPage() {
         ) : records.length === 0 ? (
           <div className="p-12 text-center">
             <FileText className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">No records found</p>
-            <p className="text-sm text-gray-400 mt-1">Try adjusting your filters or add a new expense</p>
-            <button onClick={() => navigate('/upload')} className="btn-primary mt-4 text-sm">Add Expense</button>
+            <p className="text-gray-500 font-medium">{hasFilters ? 'No records match your filters' : 'No records found'}</p>
+            <p className="text-sm text-gray-400 mt-1">
+              {hasFilters ? 'Try clearing some filters to see more results' : 'Add a new expense to get started'}
+            </p>
+            {hasFilters
+              ? <button onClick={clearFilters} className="btn-secondary mt-4 text-sm">Clear Filters</button>
+              : <button onClick={() => navigate('/upload')} className="btn-primary mt-4 text-sm">Add Expense</button>
+            }
           </div>
         ) : (
           <>
@@ -358,11 +415,14 @@ export default function RecordsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    {['Date', 'Invoice', 'Vendor', 'Category', 'BU', 'Payment', 'Amount (AED)', ''].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
-                        {h}
-                      </th>
-                    ))}
+                    <SortTh label="Date"         field="date"          sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh label="Invoice"      field={null}          sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh label="Vendor"       field="vendor_name"   sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh label="Category"     field="category"      sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh label="BU"           field="business_unit" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh label="Payment"      field={null}          sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh label="Amount (AED)" field="amount_aed"    sortBy={sortBy} sortDir={sortDir} onSort={handleSort} className="text-right" />
+                    <th className="px-4 py-3 w-24" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -420,9 +480,11 @@ export default function RecordsPage() {
                               className="w-7 h-7 rounded-lg hover:bg-brand-50 flex items-center justify-center text-gray-400 hover:text-brand-600">
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                            <button onClick={e => { e.stopPropagation(); if (confirm('Delete this expense?')) handleDelete(r.id); }}
+                            <button
+                              onClick={e => { e.stopPropagation(); setConfirmDelete(r.id); }}
                               disabled={deleting === r.id}
-                              className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center text-gray-400 hover:text-red-500">
+                              className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center text-gray-400 hover:text-red-500"
+                            >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                             {expanded === r.id ? <ChevronUp className="w-3.5 h-3.5 text-gray-400" /> : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />}
@@ -437,9 +499,9 @@ export default function RecordsPage() {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                               {[
                                 { l: 'Submitted By', v: r.submitted_by || '—' },
-                                { l: 'Currency', v: r.currency || 'AED' },
-                                { l: 'Created', v: r.created_at ? new Date(r.created_at).toLocaleString('en-AE') : '—' },
-                                { l: 'Notes', v: r.notes || '—' },
+                                { l: 'Currency',     v: r.currency || 'AED' },
+                                { l: 'Created',      v: r.created_at ? new Date(r.created_at).toLocaleString('en-AE') : '—' },
+                                { l: 'Notes',        v: r.notes || '—' },
                               ].map(({ l, v }) => (
                                 <div key={l}>
                                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">{l}</p>
@@ -560,8 +622,17 @@ export default function RecordsPage() {
         )}
       </div>
 
-      {showExport && <ExportModal onClose={() => setShowExport(false)} />}
-      {editRecord && <EditModal record={editRecord} onClose={() => setEditRecord(null)} onSave={load} />}
+      {showExport    && <ExportModal onClose={() => setShowExport(false)} />}
+      {editRecord    && <EditModal record={editRecord} onClose={() => setEditRecord(null)} onSave={load} />}
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title="Delete Expense"
+        message="This will permanently remove the expense and any linked savings record. This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => handleDelete(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

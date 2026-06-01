@@ -77,4 +77,16 @@ db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('exchange_rates'
 // Backfill amount_aed for old records
 db.exec(`UPDATE expenses SET amount_aed = amount, exchange_rate = 1 WHERE amount_aed IS NULL`);
 
+// Indexes for common query patterns (safe — CREATE INDEX IF NOT EXISTS)
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_expenses_date          ON expenses(date DESC);
+  CREATE INDEX IF NOT EXISTS idx_expenses_type          ON expenses(expense_type);
+  CREATE INDEX IF NOT EXISTS idx_expenses_category      ON expenses(category);
+  CREATE INDEX IF NOT EXISTS idx_expenses_business_unit ON expenses(business_unit);
+  CREATE INDEX IF NOT EXISTS idx_expenses_created_at    ON expenses(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_savings_date           ON clearance_savings(date DESC);
+  CREATE INDEX IF NOT EXISTS idx_savings_expense_id     ON clearance_savings(expense_id);
+  CREATE INDEX IF NOT EXISTS idx_savings_port_agent     ON clearance_savings(previous_agent, port, import_export);
+`);
+
 module.exports = db;
