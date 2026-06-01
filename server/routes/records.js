@@ -196,6 +196,7 @@ router.put('/:id', (req, res) => {
 // DELETE record
 router.delete('/:id', (req, res) => {
   try {
+    db.prepare('DELETE FROM clearance_savings WHERE expense_id = ?').run(req.params.id);
     const result = db.prepare('DELETE FROM expenses WHERE id = ?').run(req.params.id);
     if (result.changes === 0) return res.status(404).json({ error: 'Record not found' });
     res.json({ success: true });
