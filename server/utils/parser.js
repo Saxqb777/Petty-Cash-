@@ -1,6 +1,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs');
 const path = require('path');
+const { addMoney } = require('./money');
 
 const IMAGE_MIME = {
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
@@ -48,8 +49,14 @@ Return ONLY valid JSON (no markdown fences, no explanation):
   "purpose": "short clear purpose e.g. 'Vehicle fuel top-up' or 'Office parking fee'",
   "submitted_by": "person name if visible on the receipt, else null",
   "line_items": [],
-  "notes": null
-}`;
+  "notes": null,
+  "confidence": {
+    "amount": "high",
+    "date": "high",
+    "vendor_name": "high"
+  }
+}
+For any field you are guessing or uncertain about, set its confidence to "low". Only include fields you are uncertain about in the confidence object.`;
 }
 
 function buildShippingPrompt(today) {
@@ -112,7 +119,8 @@ Now output ONLY this JSON object (no explanation, no markdown — start with { a
     { "name": "Local Charges", "amount": 0 }
   ]
 }
-CHARGE RULES: match every line on the bill to a standard name above; add any extra charge as { "name": "exact name on bill", "amount": 123 }; use 0 only when a charge is genuinely absent; all amounts as plain AED numbers (no currency symbols or commas).`;
+CHARGE RULES: match every line on the bill to a standard name above; add any extra charge as { "name": "exact name on bill", "amount": 123 }; use 0 only when a charge is genuinely absent; all amounts as plain AED numbers (no currency symbols or commas).
+Also include a "confidence" object — for any field you are guessing, set its key to "low": { "amount": "high", "vendor_name": "high" }.`;
 }
 
 function buildAdnocPrompt(today) {
@@ -137,8 +145,10 @@ Return ONLY valid JSON (no markdown):
   "litres": 0.00,
   "fuel_type": "Special 95 or Super 98 or Diesel or E-Plus 91 or null",
   "line_items": [],
-  "notes": null
-}`;
+  "notes": null,
+  "confidence": { "amount": "high", "date": "high" }
+}
+For any field you are guessing, set its confidence to "low".`;
 }
 
 function cleanJson(raw) {
@@ -150,6 +160,63 @@ function cleanJson(raw) {
   const lastBrace = text.lastIndexOf('}');
   if (firstBrace !== -1 && lastBrace !== -1) text = text.slice(firstBrace, lastBrace + 1);
   return JSON.parse(text);
+}
+
+const SUPPORTED_CURRENCIES = ['AED','USD','EUR','GBP','SAR','QAR','KWD','OMR','INR'];
+const TWO_YEARS_MS = 2 * 365 * 24 * 60 * 60 * 1000;
+
+function validateExtraction(parsed, expenseType) {
+  const issues = [];
+  let needs_review = false;
+
+  // (a) amount must be positive
+  const amount = parseFloat(parsed.amount);
+  if (!amount || amount <= 0) {
+    issues.push('Amount is missing or zero');
+    needs_review = true;
+  }
+
+  // (b) date must parse, not future, not older than 2 years
+  const dateVal = parsed.date ? new Date(parsed.date) : null;
+  const now = Date.now();
+  if (!dateVal || isNaN(dateVal.getTime())) {
+    issues.push('Date could not be parsed');
+    needs_review = true;
+  } else if (dateVal.getTime() > now + 24 * 60 * 60 * 1000) {
+    issues.push(`Date is in the future (${parsed.date})`);
+    needs_review = true;
+  } else if (now - dateVal.getTime() > TWO_YEARS_MS) {
+    issues.push(`Date is more than 2 years ago (${parsed.date}) — verify it is correct`);
+    needs_review = true;
+  }
+
+  // (c) currency must be supported, else default AED
+  if (parsed.currency && !SUPPORTED_CURRENCIES.includes(parsed.currency.toUpperCase())) {
+    issues.push(`Unrecognised currency "${parsed.currency}" — defaulted to AED`);
+    parsed.currency = 'AED';
+    needs_review = true;
+  }
+
+  // (d) line_items sum check for shipping
+  if (expenseType === 'shipping' && Array.isArray(parsed.line_items) && parsed.line_items.length > 0) {
+    const lineSum = addMoney(...parsed.line_items.map(li => parseFloat(li.amount) || 0));
+    const nonZeroItems = parsed.line_items.filter(li => (parseFloat(li.amount) || 0) > 0);
+    if (nonZeroItems.length > 0 && Math.abs(lineSum - amount) > 0.5) {
+      issues.push(`Line items sum (${lineSum.toFixed(2)}) differs from total (${amount.toFixed(2)}) by more than 0.50`);
+      needs_review = true;
+    }
+  }
+
+  // (e) promote low-confidence fields to needs_review
+  const lowConfidence = Object.entries(parsed.confidence || {})
+    .filter(([, v]) => v === 'low')
+    .map(([k]) => k);
+  if (lowConfidence.length > 0) {
+    issues.push(`Low confidence fields: ${lowConfidence.join(', ')}`);
+    needs_review = true;
+  }
+
+  return { needs_review, review_notes: issues.length ? issues.join('; ') : null, low_confidence_fields: lowConfidence };
 }
 
 function normalizePort(port) {
@@ -221,6 +288,11 @@ async function parseReceiptFile(filePath, originalName = '', expenseType = 'gene
     if (!parsed.bl_number && parsed.bl_numbers.length) parsed.bl_number = parsed.bl_numbers[0];
     if (!parsed.container_number && parsed.container_numbers.length) parsed.container_number = parsed.container_numbers[0];
   }
+
+  const validation = validateExtraction(parsed, expenseType);
+  parsed.needs_review = validation.needs_review;
+  parsed.review_notes = validation.review_notes;
+  parsed.low_confidence_fields = validation.low_confidence_fields;
 
   return parsed;
 }

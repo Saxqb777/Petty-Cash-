@@ -87,6 +87,7 @@ router.post('/', (req, res) => {
       bl_number, container_number, port, shipment_type,
       container_numbers = [], bl_numbers = [],
       savings_old_fee, savings_previous_agent, savings_record = false,
+      needs_review = 0, review_notes,
     } = req.body;
 
     // Required field validation
@@ -154,8 +155,9 @@ router.post('/', (req, res) => {
         INSERT INTO expenses (expense_type, invoice_number, vendor_name, amount, currency, date,
           category, business_unit, payment_method, purpose, submitted_by, line_items, notes,
           image_path, bl_number, container_number, port, shipment_type,
-          amount_aed, exchange_rate, container_numbers, bl_numbers, file_hash)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          amount_aed, exchange_rate, container_numbers, bl_numbers, file_hash,
+          needs_review, review_notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         clean(expense_type, 50) || 'general', clean(invoice_number, 100), clean(vendor_name, 255), parsedAmount, cleanCurrency, date,
         clean(category, 100), clean(business_unit, 50), clean(payment_method, 50) || 'Cash', clean(purpose), clean(submitted_by, 100),
@@ -164,7 +166,8 @@ router.post('/', (req, res) => {
         amount_aed, rate,
         JSON.stringify(Array.isArray(container_numbers) ? container_numbers : []),
         JSON.stringify(Array.isArray(bl_numbers) ? bl_numbers : []),
-        file_hash || null
+        file_hash || null,
+        needs_review ? 1 : 0, review_notes || null
       );
 
       const expenseId = result.lastInsertRowid;
@@ -297,10 +300,9 @@ router.get('/stats/dashboard', (req, res) => {
     const recentTransactions = db.prepare("SELECT * FROM expenses ORDER BY date DESC, created_at DESC LIMIT 8").all().map(parseRecord);
     const monthChange = lastMonthTotal > 0 ? (((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100).toFixed(1) : null;
 
-    // Savings data
+    // Savings data — gross only; no fuel deduction (ADNOC covers all fuel, not just clearance trips)
     const savingsGross = db.prepare("SELECT COALESCE(SUM(savings), 0) as total FROM clearance_savings").get().total;
-    const fuelSpent = db.prepare("SELECT COALESCE(SUM(COALESCE(amount_aed, amount)), 0) as total FROM expenses WHERE expense_type = 'adnoc'").get().total;
-    const savingsNet = savingsGross - fuelSpent;
+    const savingsNet = savingsGross; // kept for API compatibility; equals gross until per-trip fuel tagging exists
 
     res.json({
       totalSpent, thisMonthTotal, lastMonthTotal, monthChange, avgTransaction, totalCount,

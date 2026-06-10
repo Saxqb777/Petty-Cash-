@@ -99,13 +99,9 @@ router.get('/summary', (req, res) => {
 
     const gross = db.prepare(savingsQuery).get(...savingsParams).gross;
 
-    let fuelQuery = "SELECT COALESCE(SUM(COALESCE(amount_aed, amount)), 0) as fuel FROM expenses WHERE expense_type = 'adnoc'";
-    const fuelParams = [];
-    if (from) { fuelQuery += ' AND date >= ?'; fuelParams.push(from); }
-    if (to) { fuelQuery += ' AND date <= ?'; fuelParams.push(to); }
-
-    const fuelCost = db.prepare(fuelQuery).get(...fuelParams).fuel;
-    const net = gross - fuelCost;
+    // Net equals gross — no fuel deduction until per-trip fuel tagging exists
+    const fuelCost = 0;
+    const net = gross;
 
     // By BU
     let buQuery = 'SELECT business_unit, SUM(savings) as total, COUNT(*) as count FROM clearance_savings WHERE 1=1';

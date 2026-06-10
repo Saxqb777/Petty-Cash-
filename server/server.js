@@ -6,7 +6,7 @@ const fs = require('fs');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
-const { UPLOADS_DIR } = require('./config/paths');
+const { UPLOADS_DIR, DATA_DIR, DB_PATH } = require('./config/paths');
 
 // ── Validate required env vars at startup ─────────────────────────────────────
 const REQUIRED_ENV = ['ANTHROPIC_API_KEY'];
@@ -38,6 +38,9 @@ const savingsRouter  = require('./routes/savings');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// ── Trust Railway's proxy so rate-limit sees real client IPs ──────────────────
+app.set('trust proxy', 1);
 
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use(helmet({
@@ -78,7 +81,7 @@ app.use('/api/savings',  savingsRouter);
 
 app.get('/api/health', (req, res) => res.json({
   status: 'ok',
-  version: '1.4.0',
+  version: '1.8.0',
   time: new Date().toISOString(),
   uptime: Math.floor(process.uptime()) + 's',
 }));
@@ -101,9 +104,43 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
+// ── Nightly SQLite backup (keep last 14) ─────────────────────────────────────
+function runBackup() {
+  try {
+    const backupDir = path.join(DATA_DIR, 'backups');
+    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+
+    const stamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const dest  = path.join(backupDir, `agthia-${stamp}.db`);
+
+    // better-sqlite3 backup is online-safe (WAL-aware)
+    const db = require('./db/database');
+    db.backup(dest).then(() => {
+      console.log(`[backup] snapshot saved → ${dest}`);
+
+      // Prune: keep newest 14, delete the rest
+      const backups = fs.readdirSync(backupDir)
+        .filter(f => f.startsWith('agthia-') && f.endsWith('.db'))
+        .sort()
+        .reverse(); // newest first
+      backups.slice(14).forEach(old => {
+        try { fs.unlinkSync(path.join(backupDir, old)); } catch (_) {}
+      });
+    }).catch(e => console.error('[backup] failed:', e.message));
+  } catch (e) {
+    console.error('[backup] setup error:', e.message);
+  }
+}
+
+// Run once 1 min after boot, then every 24h
+setTimeout(() => {
+  runBackup();
+  setInterval(runBackup, 24 * 60 * 60 * 1000);
+}, 60 * 1000);
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Agthia Petty Cash v1.4.0 running on http://localhost:${PORT}`);
+  console.log(`Agthia Petty Cash v1.8.0 running on http://localhost:${PORT}`);
 });
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────────

@@ -382,15 +382,25 @@ router.get('/', async (req, res) => {
       moneyCols.forEach(k => { gRow.getCell(k).numFmt = MONEY; align(gRow.getCell(k), 'right', 'middle'); });
       gRow.height = 26;
 
-      // Net-savings box
-      const fuel = periodClause();
-      const fuelCost = db.prepare(`SELECT COALESCE(SUM(COALESCE(amount_aed,amount)),0) as f FROM expenses WHERE expense_type='adnoc'${fuel.c}`).get(...fuel.params).f;
-
+      // Net-savings box — shows only gross savings.
+      // Fuel cost is NOT deducted here because the ADNOC expense type covers ALL
+      // company fuel, not just self-clearance trips. Mixing them would produce a
+      // misleading net figure. Finance should manually note any clearance-trip fuel
+      // costs in the savings record description if they want a net number.
+      // Formula shown explicitly in a note cell so there is no hidden arithmetic.
       let bs = (ws4.lastRow.number) + 2;
+
+      // Note cell — formula is always visible
+      ws4.mergeCells(bs, 1, bs, NCOL);
+      const noteCell = ws4.getCell(bs, 1);
+      noteCell.value = '  Note: Gross savings = SUM(old_fee − new_fee) across all clearance records in the selected period. No fuel deduction is applied — see description column for trip-specific notes.';
+      font(noteCell, { size: 9, italic: true, color: C.textMute });
+      align(noteCell, 'left', 'middle');
+      ws4.getRow(bs).height = 18;
+      bs++;
+
       [
-        ['Gross Agent-Fee Savings', aed(gt.sav), false],
-        ['Self-Clearance Fuel Cost', `(${aed(fuelCost)})`, false],
-        ['NET SAVINGS', aed(gt.sav - fuelCost), true],
+        ['Gross Agent-Fee Savings', aed(gt.sav), true],
       ].forEach(([label, val, isNet]) => {
         ws4.mergeCells(bs, 1, bs, 6);
         ws4.mergeCells(bs, 7, bs, NCOL);
