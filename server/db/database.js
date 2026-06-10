@@ -35,6 +35,9 @@ migrate(`ALTER TABLE expenses ADD COLUMN amount_aed REAL`);
 migrate(`ALTER TABLE expenses ADD COLUMN exchange_rate REAL DEFAULT 1`);
 migrate(`ALTER TABLE expenses ADD COLUMN container_numbers TEXT DEFAULT '[]'`);
 migrate(`ALTER TABLE expenses ADD COLUMN bl_numbers TEXT DEFAULT '[]'`);
+migrate(`ALTER TABLE expenses ADD COLUMN file_hash TEXT`);        // SHA-256 of receipt — duplicate detection
+migrate(`ALTER TABLE expenses ADD COLUMN needs_review INTEGER DEFAULT 0`); // AI flagged a field
+migrate(`ALTER TABLE expenses ADD COLUMN review_notes TEXT`);    // why it was flagged
 
 // New tables
 db.exec(`
@@ -82,6 +85,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_savings_date           ON clearance_savings(date DESC);
   CREATE INDEX IF NOT EXISTS idx_savings_expense_id     ON clearance_savings(expense_id);
   CREATE INDEX IF NOT EXISTS idx_savings_port_agent     ON clearance_savings(previous_agent, port, import_export);
+  CREATE INDEX IF NOT EXISTS idx_expenses_file_hash     ON expenses(file_hash);
 `);
 
 module.exports = db;

@@ -2,10 +2,18 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { parseReceiptFile } = require('../utils/parser');
 const { UPLOADS_DIR } = require('../config/paths');
+const db = require('../db/database');
 
 const router = express.Router();
+
+// SHA-256 of a file on disk — used for content-based duplicate detection
+function hashFile(filePath) {
+  const buf = fs.readFileSync(filePath);
+  return crypto.createHash('sha256').update(buf).digest('hex');
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -36,21 +44,36 @@ const FALLBACK = {
   line_items: [], notes: null, invoice_number: null
 };
 
-// Clean up uploaded files older than 7 days
+// Clean up ONLY orphaned uploads (no expense references them) older than 7 days.
+// Receipts linked to an expense via image_path are kept FOREVER — for a finance
+// app the receipt is the audit trail and must never be auto-deleted.
 function cleanOldUploads() {
+  let removed = 0;
   try {
+    // Build the set of filenames still referenced by any expense.image_path
+    const referenced = new Set();
+    db.prepare("SELECT image_path FROM expenses WHERE image_path IS NOT NULL AND image_path != ''")
+      .all()
+      .forEach(r => referenced.add(path.basename(r.image_path)));
+
     const files = fs.readdirSync(UPLOADS_DIR);
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     files.forEach(f => {
       if (f === '.gitkeep') return;
+      if (referenced.has(f)) return;            // linked to a record — never delete
       const fp = path.join(UPLOADS_DIR, f);
       const stat = fs.statSync(fp);
-      if (stat.mtimeMs < cutoff) fs.unlinkSync(fp);
+      if (stat.mtimeMs < cutoff) { fs.unlinkSync(fp); removed++; }
     });
-  } catch (_) {}
+  } catch (e) {
+    console.warn('[uploads] cleanup error:', e.message);
+  }
+  return removed;
 }
 
-// Run cleanup once a day
+// Run cleanup at startup (log the result) and once a day thereafter
+const cleanedAtBoot = cleanOldUploads();
+console.log(`[uploads] orphan cleanup at boot: ${cleanedAtBoot} file(s) removed (linked receipts are kept forever)`);
 setInterval(cleanOldUploads, 24 * 60 * 60 * 1000);
 
 router.post('/', (req, res, next) => {
@@ -64,6 +87,13 @@ router.post('/', (req, res, next) => {
     if (req.file.size === 0) return res.status(400).json({ error: 'Uploaded file is empty' });
 
     const expenseType = req.body.expense_type || 'general';
+
+    // Content hash for duplicate detection (same bytes = same receipt)
+    const file_hash = hashFile(req.file.path);
+    const existingByHash = db.prepare(
+      'SELECT id, vendor_name, amount, date FROM expenses WHERE file_hash = ?'
+    ).get(file_hash);
+
     let parsed = { ...FALLBACK };
     let parseError = null;
     try {
@@ -75,6 +105,10 @@ router.post('/', (req, res, next) => {
 
     res.json({
       image_path: `/uploads/${req.file.filename}`,
+      file_hash,
+      duplicate: existingByHash
+        ? { type: 'exact', existingId: existingByHash.id, vendor: existingByHash.vendor_name, amount: existingByHash.amount, date: existingByHash.date }
+        : null,
       parsed,
       parseError
     });
