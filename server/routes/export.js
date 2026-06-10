@@ -2,8 +2,11 @@ const express = require('express');
 const ExcelJS = require('exceljs');
 const db = require('../db/database');
 const { addMoney } = require('../utils/money');
+const { requireAuth, requireMinRole } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(requireAuth);
+router.use(requireMinRole('finance'));
 
 // ── Palette (Agthia sage-green brand) ───────────────────────────────────────────
 const C = {
@@ -63,8 +66,9 @@ router.get('/', async (req, res) => {
       return { c, params };
     };
 
+    const orgId = req.user.org_id;
     const exp = periodClause();
-    const records = db.prepare(`SELECT * FROM expenses WHERE 1=1${exp.c} ORDER BY date ASC`).all(...exp.params).map(r => ({
+    const records = db.prepare(`SELECT * FROM expenses WHERE org_id=${orgId}${exp.c} ORDER BY date ASC`).all(...exp.params).map(r => ({
       ...r,
       line_items:        JSON.parse(r.line_items        || '[]'),
       container_numbers: JSON.parse(r.container_numbers || '[]'),
@@ -72,7 +76,7 @@ router.get('/', async (req, res) => {
     }));
 
     const sav = periodClause();
-    const savingsRecords = db.prepare(`SELECT * FROM clearance_savings WHERE 1=1${sav.c} ORDER BY date ASC`).all(...sav.params);
+    const savingsRecords = db.prepare(`SELECT * FROM clearance_savings WHERE org_id=${orgId}${sav.c} ORDER BY date ASC`).all(...sav.params);
 
     const wb = new ExcelJS.Workbook();
     wb.creator = 'Agthia Petty Cash';
@@ -180,14 +184,14 @@ router.get('/', async (req, res) => {
       r++;
     };
 
-    const catData = db.prepare(`SELECT category as name, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total FROM expenses WHERE 1=1${exp.c} GROUP BY category ORDER BY total DESC`).all(...exp.params);
+    const catData = db.prepare(`SELECT category as name, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total FROM expenses WHERE org_id=${orgId}${exp.c} GROUP BY category ORDER BY total DESC`).all(...exp.params);
     breakdownTable('  SPEND BY CATEGORY', catData);
 
-    const typeData = db.prepare(`SELECT expense_type as name, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total FROM expenses WHERE 1=1${exp.c} GROUP BY expense_type ORDER BY total DESC`).all(...exp.params)
+    const typeData = db.prepare(`SELECT expense_type as name, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total FROM expenses WHERE org_id=${orgId}${exp.c} GROUP BY expense_type ORDER BY total DESC`).all(...exp.params)
       .map(x => ({ ...x, name: typeLabel(x.name) }));
     breakdownTable('  SPEND BY TYPE', typeData);
 
-    const buData = db.prepare(`SELECT business_unit as name, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total FROM expenses WHERE 1=1${exp.c} GROUP BY business_unit ORDER BY total DESC`).all(...exp.params);
+    const buData = db.prepare(`SELECT business_unit as name, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total FROM expenses WHERE org_id=${orgId}${exp.c} GROUP BY business_unit ORDER BY total DESC`).all(...exp.params);
     breakdownTable('  SPEND BY BUSINESS UNIT', buData);
 
     // ═══════════════════════════════════════════════════════════════════════════

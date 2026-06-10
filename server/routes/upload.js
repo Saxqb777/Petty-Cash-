@@ -6,8 +6,10 @@ const crypto = require('crypto');
 const { parseReceiptFile } = require('../utils/parser');
 const { UPLOADS_DIR } = require('../config/paths');
 const db = require('../db/database');
+const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
+router.use(requireAuth);
 
 // SHA-256 of a file on disk — used for content-based duplicate detection
 function hashFile(filePath) {
@@ -91,8 +93,8 @@ router.post('/', (req, res, next) => {
     // Content hash for duplicate detection (same bytes = same receipt)
     const file_hash = hashFile(req.file.path);
     const existingByHash = db.prepare(
-      'SELECT id, vendor_name, amount, date FROM expenses WHERE file_hash = ?'
-    ).get(file_hash);
+      'SELECT id, vendor_name, amount, date FROM expenses WHERE file_hash = ? AND org_id = ?'
+    ).get(file_hash, req.user.org_id);
 
     let parsed = { ...FALLBACK };
     let parseError = null;

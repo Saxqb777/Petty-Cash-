@@ -1,13 +1,18 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import Sidebar from './components/Sidebar';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import DashboardPage from './pages/DashboardPage';
 import UploadPage from './pages/UploadPage';
 import RecordsPage from './pages/RecordsPage';
 import SettingsPage from './pages/SettingsPage';
 import SavingsPage from './pages/SavingsPage';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import PendingPage from './pages/PendingPage';
+import MembersPage from './pages/MembersPage';
 
 const pageVariants = {
   initial: { opacity: 0, y: 10 },
@@ -33,8 +38,56 @@ function AnimatedRoutes() {
         <Route path="/records"  element={<PageWrapper><RecordsPage /></PageWrapper>} />
         <Route path="/settings" element={<PageWrapper><SettingsPage /></PageWrapper>} />
         <Route path="/savings"  element={<PageWrapper><SavingsPage /></PageWrapper>} />
+        <Route path="/members"  element={<PageWrapper><MembersPage /></PageWrapper>} />
       </Routes>
     </AnimatePresence>
+  );
+}
+
+function AppShell() {
+  const { user } = useAuth();
+  const location = useLocation();
+
+  // Still loading auth state
+  if (user === undefined) {
+    return (
+      <div className="min-h-screen bg-[#0d1117] flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Public routes — always accessible
+  const publicPaths = ['/login', '/signup', '/pending'];
+  if (publicPaths.includes(location.pathname)) {
+    // If logged in and active, redirect away from login/signup
+    if (user && location.pathname !== '/pending') {
+      const active = user.memberships?.find(m => m.status === 'active');
+      if (active) return <Navigate to="/" replace />;
+    }
+    return (
+      <Routes>
+        <Route path="/login"   element={<LoginPage />} />
+        <Route path="/signup"  element={<SignupPage />} />
+        <Route path="/pending" element={<PendingPage />} />
+      </Routes>
+    );
+  }
+
+  // Not logged in → redirect to login
+  if (!user) return <Navigate to="/login" replace />;
+
+  // Logged in but pending → redirect to pending screen
+  const active = user.memberships?.find(m => m.status === 'active');
+  if (!active) return <Navigate to="/pending" replace />;
+
+  return (
+    <div className="flex min-h-screen bg-[#0d1117]">
+      <Sidebar />
+      <main className="flex-1 overflow-auto">
+        <AnimatedRoutes />
+      </main>
+    </div>
   );
 }
 
@@ -42,14 +95,11 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ToastProvider>
-        <BrowserRouter>
-          <div className="flex min-h-screen bg-[#f1f5f9]">
-            <Sidebar />
-            <main className="flex-1 overflow-auto">
-              <AnimatedRoutes />
-            </main>
-          </div>
-        </BrowserRouter>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppShell />
+          </BrowserRouter>
+        </AuthProvider>
       </ToastProvider>
     </ErrorBoundary>
   );
