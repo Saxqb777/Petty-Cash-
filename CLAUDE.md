@@ -198,6 +198,16 @@ Four sheets, Agthia sage-green palette, frozen headers, auto-filter:
 
 ---
 
+## Phase 0 Hardening (completed)
+
+- **Receipt retention fix** — cleanup only deletes orphaned files (no `image_path` reference); linked receipts kept forever for audit trail
+- **Money math** — `server/utils/money.js` with `toFils/fromFils/addMoney/convertToAed`; all totals use integer fils to avoid float drift (0.1+0.2===0.3)
+- **AED conversion rules** — AED forces `exchange_rate=1`; foreign currency validated against supported list; `amount_aed` is a snapshot at save time — **historical records do NOT re-convert when rates change; this is intentional for accounting correctness**
+- **Duplicate detection (3 tiers)** — (1) exact file SHA-256 hash → hard reject; (2) invoice+vendor+date+amount → hard reject; (3) no invoice, same vendor+date+amount → soft warning returned with 201
+- **AI extraction validation** — post-extraction checks: positive amount, date sanity (not future, not >2y), supported currency, shipping line_items sum vs total (±0.50 tolerance), low-confidence fields → `needs_review` + `review_notes` persisted on expense
+- **Savings math fixed** — removed all-ADNOC fuel deduction from net savings (ADNOC covers all fuel, not just clearance trips); Sheet 4 shows gross savings only with explicit formula note cell
+- **Express hardening** — `trust proxy 1` for Railway; nightly SQLite backup to `/data/backups/agthia-YYYY-MM-DD.db` (keeps 14); version bumped to v1.8.0
+
 ## What's Been Built (history)
 
 - Production hardening: Helmet, compression, rate limiting, graceful shutdown, env validation
