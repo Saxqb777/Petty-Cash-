@@ -229,14 +229,48 @@ function normalizePort(port) {
   return port;
 }
 
-async function parseReceiptFile(filePath, originalName = '', expenseType = 'general') {
+function buildCustomPrompt(today, fieldsSchema, aiHints) {
+  const lines = [];
+  fieldsSchema.forEach(f => {
+    if (f.type === 'currency') {
+      lines.push(`  "amount": 0.00`, `  "currency": "AED"`);
+    } else if (f.type === 'chips') {
+      lines.push(`  "${f.key}": []`);
+    } else if (f.type === 'select' && f.options?.length) {
+      lines.push(`  "${f.key}": "one of: ${f.options.join(' | ')}"`);
+    } else if (f.type === 'number') {
+      lines.push(`  "${f.key}": 0`);
+    } else if (f.type === 'date') {
+      lines.push(`  "${f.key}": "YYYY-MM-DD"`);
+    } else if (f.key && f.type !== 'charges') {
+      lines.push(`  "${f.key}": "..."`);
+    }
+  });
+  lines.push(`  "confidence": {}`);
+
+  return `You are extracting expense data from a UAE business receipt or invoice for Agthia Group.
+Today: ${today}
+
+${aiHints ? `CONTEXT:\n${aiHints}\n\n` : ''}DATE PARSING: Handle any format → output YYYY-MM-DD.
+BUSINESS UNIT: If the receipt mentions "Al Foah", "AAFB", "GMFF", "BMB" → set business_unit.
+
+Return ONLY valid JSON (no markdown):
+{
+${lines.join(',\n')}
+}
+
+For any field you are uncertain about, add its key to the confidence object with value "low".`;
+}
+
+async function parseReceiptFile(filePath, originalName = '', expenseType = 'general', customSchema = null, aiHints = null) {
   const client = getClient();
   const today = new Date().toISOString().split('T')[0];
   const ext = path.extname(filePath).toLowerCase();
   const fileData = fs.readFileSync(filePath).toString('base64');
 
   let prompt;
-  if (expenseType === 'shipping') prompt = buildShippingPrompt(today);
+  if (customSchema) prompt = buildCustomPrompt(today, customSchema, aiHints);
+  else if (expenseType === 'shipping') prompt = buildShippingPrompt(today);
   else if (expenseType === 'adnoc') prompt = buildAdnocPrompt(today);
   else prompt = buildPrompt(today);
 

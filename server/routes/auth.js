@@ -74,6 +74,9 @@ router.post('/signup', async (req, res) => {
         db.prepare('INSERT OR IGNORE INTO settings (key, value, org_id) VALUES (?, ?, ?)')
           .run('exchange_rates', '{"USD":3.6725,"EUR":4.02,"GBP":4.68,"SAR":0.98,"QAR":1.01,"KWD":11.96,"OMR":9.53,"INR":0.044}', orgId);
 
+        // Seed default expense types for new org
+        db.seedExpenseTypesForOrg(orgId);
+
         db.prepare(
           'INSERT INTO memberships (user_id, org_id, role, status) VALUES (?, ?, ?, ?)'
         ).run(userId, orgId, 'owner', 'active');

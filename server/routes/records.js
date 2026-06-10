@@ -28,9 +28,10 @@ const parseRecord = (r) => {
       line_items:        JSON.parse(r.line_items        || '[]'),
       container_numbers: JSON.parse(r.container_numbers || '[]'),
       bl_numbers:        JSON.parse(r.bl_numbers        || '[]'),
+      custom_fields:     JSON.parse(r.custom_fields     || '{}'),
     };
   } catch {
-    return { ...r, line_items: [], container_numbers: [], bl_numbers: [] };
+    return { ...r, line_items: [], container_numbers: [], bl_numbers: [], custom_fields: {} };
   }
 };
 
@@ -83,13 +84,14 @@ router.get('/:id', (req, res) => {
 router.post('/', (req, res) => {
   try {
     const {
-      expense_type = 'general', invoice_number, vendor_name, amount, currency = 'AED', date,
+      expense_type = 'general', expense_type_id, invoice_number, vendor_name, amount, currency = 'AED', date,
       category, business_unit, payment_method = 'Cash', purpose, submitted_by,
       line_items = [], notes, image_path, file_hash,
       bl_number, container_number, port, shipment_type,
       container_numbers = [], bl_numbers = [],
       savings_old_fee, savings_previous_agent, savings_record = false,
       needs_review = 0, review_notes,
+      custom_fields = {},
     } = req.body;
 
     if (!vendor_name || !amount || !date || !category)
@@ -132,14 +134,15 @@ router.post('/', (req, res) => {
 
     const doInsert = db.transaction(() => {
       const result = db.prepare(`
-        INSERT INTO expenses (org_id, expense_type, invoice_number, vendor_name, amount, currency, date,
+        INSERT INTO expenses (org_id, expense_type, expense_type_id, invoice_number, vendor_name, amount, currency, date,
           category, business_unit, payment_method, purpose, submitted_by, line_items, notes,
           image_path, bl_number, container_number, port, shipment_type,
-          amount_aed, exchange_rate, container_numbers, bl_numbers, file_hash, needs_review, review_notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          amount_aed, exchange_rate, container_numbers, bl_numbers, file_hash, needs_review, review_notes, custom_fields)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         orgId,
-        clean(expense_type, 50) || 'general', clean(invoice_number, 100), clean(vendor_name, 255),
+        clean(expense_type, 50) || 'general', expense_type_id || null,
+        clean(invoice_number, 100), clean(vendor_name, 255),
         parsedAmount, cleanCurrency, date, clean(category, 100), clean(business_unit, 50),
         clean(payment_method, 50) || 'Cash', clean(purpose), clean(submitted_by, 100),
         JSON.stringify(line_items), clean(notes, 1000), image_path || null,
@@ -147,7 +150,8 @@ router.post('/', (req, res) => {
         amount_aed, rate,
         JSON.stringify(Array.isArray(container_numbers) ? container_numbers : []),
         JSON.stringify(Array.isArray(bl_numbers) ? bl_numbers : []),
-        file_hash || null, needs_review ? 1 : 0, review_notes || null
+        file_hash || null, needs_review ? 1 : 0, review_notes || null,
+        JSON.stringify(typeof custom_fields === 'object' && custom_fields ? custom_fields : {})
       );
 
       const expenseId = result.lastInsertRowid;
@@ -199,7 +203,7 @@ router.put('/:id', (req, res) => {
         category=?, business_unit=?, payment_method=?, purpose=?, submitted_by=?,
         line_items=?, notes=?, image_path=?,
         bl_number=?, container_number=?, port=?, shipment_type=?,
-        amount_aed=?, exchange_rate=?, container_numbers=?, bl_numbers=?
+        amount_aed=?, exchange_rate=?, container_numbers=?, bl_numbers=?, custom_fields=?
       WHERE id=? AND org_id=?
     `).run(
       b.expense_type ?? ex.expense_type ?? 'general',
@@ -220,6 +224,7 @@ router.put('/:id', (req, res) => {
       amount_aed, rate,
       b.container_numbers !== undefined ? JSON.stringify(Array.isArray(b.container_numbers) ? b.container_numbers : []) : (ex.container_numbers || '[]'),
       b.bl_numbers !== undefined ? JSON.stringify(Array.isArray(b.bl_numbers) ? b.bl_numbers : []) : (ex.bl_numbers || '[]'),
+      b.custom_fields !== undefined ? JSON.stringify(b.custom_fields || {}) : (ex.custom_fields || '{}'),
       req.params.id, req.user.org_id
     );
 
@@ -267,11 +272,12 @@ router.get('/stats/dashboard', (req, res) => {
     const monthChange = lastMonthTotal > 0 ? (((thisMonthTotal - lastMonthTotal) / lastMonthTotal) * 100).toFixed(1) : null;
 
     const savingsGross = db.prepare("SELECT COALESCE(SUM(savings),0) as v FROM clearance_savings WHERE org_id=?").get(orgId).v;
+    const dailySpend = qa("SELECT date, ROUND(SUM(COALESCE(amount_aed,amount)),2) as total FROM expenses WHERE org_id=? AND date >= date('now','-365 days') GROUP BY date ORDER BY date ASC");
 
     res.json({
       totalSpent, thisMonthTotal, lastMonthTotal, monthChange, avgTransaction, totalCount,
       foreignCurrencyCount, needsReviewCount, topCategory, categoryBreakdown, monthlyTrend,
-      recentTransactions, savingsGross, savingsNet: savingsGross,
+      recentTransactions, savingsGross, savingsNet: savingsGross, dailySpend,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

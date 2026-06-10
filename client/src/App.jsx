@@ -13,6 +13,7 @@ import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import PendingPage from './pages/PendingPage';
 import MembersPage from './pages/MembersPage';
+import ExpenseTypeBuilderPage from './pages/ExpenseTypeBuilderPage';
 
 const pageVariants = {
   initial: { opacity: 0, y: 10 },
@@ -38,7 +39,8 @@ function AnimatedRoutes() {
         <Route path="/records"  element={<PageWrapper><RecordsPage /></PageWrapper>} />
         <Route path="/settings" element={<PageWrapper><SettingsPage /></PageWrapper>} />
         <Route path="/savings"  element={<PageWrapper><SavingsPage /></PageWrapper>} />
-        <Route path="/members"  element={<PageWrapper><MembersPage /></PageWrapper>} />
+        <Route path="/members"       element={<PageWrapper><MembersPage /></PageWrapper>} />
+        <Route path="/type-builder"  element={<PageWrapper><ExpenseTypeBuilderPage /></PageWrapper>} />
       </Routes>
     </AnimatePresence>
   );

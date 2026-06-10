@@ -24,6 +24,12 @@ export const api = {
   deleteRecord: (id) => request(`/records/${id}`, { method: 'DELETE' }),
   getDashboard: () => request('/records/stats/dashboard'),
 
+  // Expense types
+  getExpenseTypes: () => request('/expense-types'),
+  createExpenseType: (data) => request('/expense-types', { method: 'POST', body: JSON.stringify(data) }),
+  updateExpenseType: (id, data) => request(`/expense-types/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteExpenseType: (id) => request(`/expense-types/${id}`, { method: 'DELETE' }),
+
   // Upload
   uploadBill: (file, expenseType = 'general') => {
     const fd = new FormData();

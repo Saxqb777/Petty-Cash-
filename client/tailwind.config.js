@@ -6,6 +6,7 @@ export default {
       fontFamily: {
         sans:    ['Inter', 'system-ui', 'sans-serif'],
         heading: ['DM Sans', 'system-ui', 'sans-serif'],
+        mono:    ['JetBrains Mono', 'ui-monospace', 'monospace'],
       },
       colors: {
         // Agthia brand — sage/olive leaf green sampled from the logo mark

@@ -90,6 +90,19 @@ router.post('/', (req, res, next) => {
 
     const expenseType = req.body.expense_type || 'general';
 
+    // Look up custom type schema if this is a non-builtin type
+    let customSchema = null;
+    let customAiHints = null;
+    const typeRow = db.prepare(
+      'SELECT * FROM expense_types WHERE org_id = ? AND slug = ? AND is_archived = 0'
+    ).get(req.user.org_id, expenseType);
+    if (typeRow && !typeRow.is_builtin) {
+      try {
+        customSchema = JSON.parse(typeRow.fields_schema || '[]');
+        customAiHints = typeRow.ai_hints;
+      } catch (_) {}
+    }
+
     // Content hash for duplicate detection (same bytes = same receipt)
     const file_hash = hashFile(req.file.path);
     const existingByHash = db.prepare(
@@ -99,7 +112,7 @@ router.post('/', (req, res, next) => {
     let parsed = { ...FALLBACK };
     let parseError = null;
     try {
-      parsed = await parseReceiptFile(req.file.path, req.file.originalname, expenseType);
+      parsed = await parseReceiptFile(req.file.path, req.file.originalname, expenseType, customSchema, customAiHints);
     } catch (err) {
       console.warn('Claude parse failed:', err.message);
       parseError = err.message;

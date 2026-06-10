@@ -134,6 +134,104 @@ try {
 // ── Backfill amount_aed for old records ───────────────────────────────────────
 db.exec(`UPDATE expenses SET amount_aed = amount, exchange_rate = 1 WHERE amount_aed IS NULL`);
 
+// ── Phase 2: Custom expense types ────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS expense_types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    org_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    icon TEXT DEFAULT 'receipt',
+    color TEXT DEFAULT '#62833A',
+    description TEXT,
+    fields_schema TEXT DEFAULT '[]',
+    ai_hints TEXT,
+    is_builtin INTEGER DEFAULT 0,
+    is_archived INTEGER DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(org_id, slug)
+  )
+`);
+
+migrate(`ALTER TABLE expenses ADD COLUMN expense_type_id INTEGER REFERENCES expense_types(id)`);
+migrate(`ALTER TABLE expenses ADD COLUMN custom_fields TEXT DEFAULT '{}'`);
+
+// ── Default built-in types (seeded per-org) ───────────────────────────────────
+const DEFAULT_TYPES = [
+  {
+    name: 'Petrol & Fuel', slug: 'adnoc', icon: 'fuel', color: '#f97316',
+    description: 'Fuel station receipts and vehicle fuel expenses',
+    fields_schema: JSON.stringify([
+      {key:'invoice_number',label:'Receipt No.',type:'text'},
+      {key:'amount',label:'Amount',type:'currency',required:true},
+      {key:'date',label:'Date',type:'date',required:true},
+      {key:'fuel_type',label:'Fuel Type',type:'select',options:['Special 95','Super 98','Diesel','E-Plus 91'],custom:true},
+      {key:'litres',label:'Litres',type:'number',custom:true},
+      {key:'odometer',label:'Odometer',type:'text',custom:true},
+      {key:'vehicle_plate',label:'Vehicle Plate',type:'text',custom:true},
+      {key:'business_unit',label:'Business Unit',type:'select',options:['AAFB','Al Foah','GMFF','BMB','Other']},
+      {key:'payment_method',label:'Payment Method',type:'select',options:['Card','Cash']},
+      {key:'purpose',label:'Trip / Route',type:'text'},
+      {key:'submitted_by',label:'Submitted By',type:'text'},
+      {key:'notes',label:'Notes',type:'textarea'}
+    ]),
+    ai_hints: 'ADNOC, ENOC, EPPCO, or other UAE fuel station receipt. Extract fuel type, litres, odometer reading, vehicle plate if visible.',
+    is_builtin: 1, sort_order: 0
+  },
+  {
+    name: 'Shipping Line Bill', slug: 'shipping', icon: 'ship', color: '#3b82f6',
+    description: 'Freight invoices, THC, demurrage, customs clearance bills',
+    fields_schema: JSON.stringify([
+      {key:'vendor_name',label:'Shipping Line / Agent',type:'text',required:true},
+      {key:'invoice_number',label:'Invoice / Reference No.',type:'text'},
+      {key:'bl_numbers',label:'BL Numbers',type:'chips'},
+      {key:'container_numbers',label:'Container Numbers',type:'chips'},
+      {key:'port',label:'Port',type:'select',options:['AUH','DXB','AJM','SHJ']},
+      {key:'shipment_type',label:'Import / Export',type:'select',options:['Import','Export']},
+      {key:'date',label:'Date',type:'date',required:true},
+      {key:'business_unit',label:'Business Unit',type:'select',options:['AAFB','Al Foah','GMFF','BMB','Other']},
+      {key:'line_items',label:'Charges Breakdown',type:'charges'},
+      {key:'notes',label:'Notes',type:'textarea'}
+    ]),
+    ai_hints: 'Shipping line bill, freight invoice, or clearance statement. Extract all BL numbers, container numbers, port, and every charge line item.',
+    is_builtin: 1, sort_order: 1
+  },
+  {
+    name: 'General Expense', slug: 'general', icon: 'grid', color: '#62833A',
+    description: 'Parking, printing, office supplies, materials, food, and any other expense',
+    fields_schema: JSON.stringify([
+      {key:'vendor_name',label:'Vendor / Shop Name',type:'text',required:true},
+      {key:'invoice_number',label:'Invoice Number',type:'text'},
+      {key:'amount',label:'Amount',type:'currency',required:true},
+      {key:'date',label:'Date',type:'date',required:true},
+      {key:'category',label:'Category',type:'select',required:true,options:['Fuel & Transport','Parking','Customs & Clearance','Printing & Photocopy','Materials & Supplies','Food & Beverages','Office Supplies','Accommodation & Travel','Medical','Miscellaneous']},
+      {key:'business_unit',label:'Business Unit',type:'select',options:['AAFB','Al Foah','GMFF','BMB','Other']},
+      {key:'payment_method',label:'Payment Method',type:'select',options:['Cash','Card']},
+      {key:'purpose',label:'Purpose',type:'text'},
+      {key:'submitted_by',label:'Submitted By',type:'text'},
+      {key:'notes',label:'Notes',type:'textarea'}
+    ]),
+    ai_hints: 'General petty cash receipt: parking, printing, photocopy, office supplies, food, stationery, accommodation, or miscellaneous expense.',
+    is_builtin: 1, sort_order: 2
+  }
+];
+
+const seedStmt = db.prepare(`
+  INSERT OR IGNORE INTO expense_types
+    (org_id, name, slug, icon, color, description, fields_schema, ai_hints, is_builtin, sort_order)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+
+const seedExpenseTypesForOrg = (orgId) => {
+  DEFAULT_TYPES.forEach(t =>
+    seedStmt.run(orgId, t.name, t.slug, t.icon, t.color, t.description, t.fields_schema, t.ai_hints, t.is_builtin, t.sort_order)
+  );
+};
+
+// Seed for Agthia Group (org_id = 1)
+seedExpenseTypesForOrg(1);
+
 // ── Indexes ───────────────────────────────────────────────────────────────────
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_expenses_date          ON expenses(date DESC);
@@ -151,6 +249,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_sessions_expires       ON sessions(expires_at);
   CREATE INDEX IF NOT EXISTS idx_memberships_user       ON memberships(user_id);
   CREATE INDEX IF NOT EXISTS idx_memberships_org        ON memberships(org_id);
+  CREATE INDEX IF NOT EXISTS idx_expense_types_org      ON expense_types(org_id);
 `);
 
+db.seedExpenseTypesForOrg = seedExpenseTypesForOrg;
 module.exports = db;

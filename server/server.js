@@ -34,8 +34,9 @@ const uploadRouter  = require('./routes/upload');
 const exportRouter  = require('./routes/export');
 const settingsRouter = require('./routes/settings');
 const savingsRouter = require('./routes/savings');
-const authRouter    = require('./routes/auth');
-const membersRouter = require('./routes/members');
+const authRouter         = require('./routes/auth');
+const membersRouter      = require('./routes/members');
+const expenseTypesRouter = require('./routes/expense-types');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -76,8 +77,9 @@ app.use('/api', apiLimiter);
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 // ── API routes ────────────────────────────────────────────────────────────────
-app.use('/api/auth',    authRouter);
-app.use('/api/members', membersRouter);
+app.use('/api/auth',          authRouter);
+app.use('/api/members',       membersRouter);
+app.use('/api/expense-types', expenseTypesRouter);
 app.use('/api/records',  recordsRouter);
 app.use('/api/upload',   uploadRouter);
 app.use('/api/export',   exportRouter);
@@ -154,7 +156,7 @@ function runBackup() {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 const server = app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`Agthia Petty Cash v1.8.0 running on http://localhost:${PORT}`);
+  console.log(`Agthia Petty Cash v2.0.0 running on http://localhost:${PORT}`);
   await seedOwner();
   setTimeout(() => { runBackup(); setInterval(runBackup, 24 * 60 * 60 * 1000); }, 60 * 1000);
 });

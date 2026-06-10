@@ -69,7 +69,7 @@ const VARIANTS = {
   },
 };
 
-export default function StatsCard({ title, value, sub, icon: Icon, trend, trendLabel, variant = 'blue' }) {
+export default function StatsCard({ title, value, sub, icon: Icon, trend, trendLabel, variant = 'blue', monoValue = false }) {
   const v = VARIANTS[variant] || VARIANTS.blue;
   const animatedValue = useCountUp(value);
   const isPos = parseFloat(trend) > 0;
@@ -99,7 +99,7 @@ export default function StatsCard({ title, value, sub, icon: Icon, trend, trendL
         )}
       </div>
 
-      <p className={cn('text-[1.6rem] font-bold font-heading tracking-tight leading-none mb-1.5 relative', v.val)}>
+      <p className={cn('text-[1.6rem] font-bold tracking-tight leading-none mb-1.5 relative', monoValue ? 'font-mono tabular-nums' : 'font-heading', v.val)}>
         {animatedValue}
       </p>
 

@@ -1,16 +1,17 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Table2, Settings, Leaf, PiggyBank, Users, LogOut } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Table2, Settings, Leaf, PiggyBank, Users, LogOut, Layers } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const ROLE_RANK = { member: 1, finance: 2, admin: 3, owner: 4 };
 
 const nav = [
-  { to: '/',        icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/upload',  icon: PlusCircle,      label: 'Add Expense' },
-  { to: '/records', icon: Table2,          label: 'Records' },
-  { to: '/savings', icon: PiggyBank,       label: 'Savings' },
-  { to: '/settings',icon: Settings,        label: 'Settings' },
-  { to: '/members', icon: Users,           label: 'Members',  minRole: 'admin' },
+  { to: '/',             icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/upload',       icon: PlusCircle,      label: 'Add Expense' },
+  { to: '/records',      icon: Table2,          label: 'Records' },
+  { to: '/savings',      icon: PiggyBank,       label: 'Savings' },
+  { to: '/settings',     icon: Settings,        label: 'Settings' },
+  { to: '/members',      icon: Users,           label: 'Members',      minRole: 'admin' },
+  { to: '/type-builder', icon: Layers,          label: 'Expense Types', minRole: 'admin' },
 ];
 
 export default function Sidebar() {
@@ -93,7 +94,7 @@ export default function Sidebar() {
       {/* Footer */}
       <div className="px-5 py-3 border-t border-white/[0.06]">
         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-brand-500/10 border border-brand-500/20 rounded text-brand-400 text-[10px] font-mono font-medium">
-          v1.8.0
+          v2.0.0
         </span>
       </div>
     </aside>

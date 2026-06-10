@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { DollarSign, Calendar, BarChart2, Plus, RefreshCw, ArrowRight, PiggyBank, Fuel, TrendingUp } from 'lucide-react';
+import { DollarSign, Calendar, BarChart2, Plus, RefreshCw, ArrowRight, PiggyBank, TrendingUp, AlertTriangle } from 'lucide-react';
 import StatsCard from '../components/StatsCard';
 import CategoryDonutChart from '../components/CategoryDonutChart';
 import MonthlyBarChart from '../components/MonthlyBarChart';
 import RecentTransactions from '../components/RecentTransactions';
+import SpendHeatmap from '../components/SpendHeatmap';
 import { api } from '../utils/api';
 
 const fmt = (n) => new Intl.NumberFormat('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+const NUM = 'font-mono tabular-nums';
 
 function Skeleton({ className = '' }) {
   return <div className={`skeleton ${className}`} />;
@@ -84,6 +86,7 @@ export default function DashboardPage() {
               sub={`${stats?.totalCount || 0} transactions across all time`}
               icon={DollarSign}
               variant="green"
+              monoValue
             />
           </motion.div>
           <motion.div variants={item}>
@@ -95,6 +98,7 @@ export default function DashboardPage() {
               trend={stats?.monthChange}
               trendLabel="vs last month"
               variant="blue"
+              monoValue
             />
           </motion.div>
           <motion.div variants={item}>
@@ -104,6 +108,7 @@ export default function DashboardPage() {
               sub="Per expense entry"
               icon={BarChart2}
               variant="violet"
+              monoValue
             />
           </motion.div>
         </motion.div>
@@ -133,34 +138,38 @@ export default function DashboardPage() {
         </motion.div>
       </motion.div>
 
+      {/* Needs-review alert */}
+      {!loading && stats?.needsReviewCount > 0 && (
+        <motion.div variants={item}
+          className="mb-5 p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-amber-100 transition-colors"
+          onClick={() => navigate('/records')}>
+          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+          <p className="text-sm text-amber-800 font-medium">
+            {stats.needsReviewCount} expense{stats.needsReviewCount > 1 ? 's' : ''} need review — low-confidence AI extraction
+          </p>
+          <ArrowRight className="w-4 h-4 text-amber-500 ml-auto" />
+        </motion.div>
+      )}
+
       {/* Savings Strip */}
-      {!loading && stats && (stats.savingsGross > 0 || stats.fuelSpent > 0) && (
-        <motion.div variants={item} className="grid grid-cols-3 gap-4 mb-5">
+      {!loading && stats && stats.savingsGross > 0 && (
+        <motion.div variants={item} className="grid grid-cols-2 gap-4 mb-5">
           <div className="card p-4 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
-              <PiggyBank className="w-4.5 h-4.5 text-emerald-600" />
+              <PiggyBank className="w-4 h-4 text-emerald-600" />
             </div>
             <div>
               <p className="text-xs text-slate-400 font-medium">Gross Clearance Savings</p>
-              <p className="text-base font-bold text-slate-800">AED {fmt(stats.savingsGross)}</p>
-            </div>
-          </div>
-          <div className="card p-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
-              <Fuel className="w-4.5 h-4.5 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 font-medium">Fuel Cost (Self-Clearance)</p>
-              <p className="text-base font-bold text-slate-800">AED {fmt(stats.fuelSpent)}</p>
+              <p className={`text-base font-bold text-slate-800 ${NUM}`}>AED {fmt(stats.savingsGross)}</p>
             </div>
           </div>
           <div className="card p-4 flex items-center gap-3 border-brand-200 bg-brand-50/30">
             <div className="w-9 h-9 rounded-xl bg-brand-100 flex items-center justify-center flex-shrink-0">
-              <TrendingUp className="w-4.5 h-4.5 text-brand-600" />
+              <TrendingUp className="w-4 h-4 text-brand-600" />
             </div>
             <div>
               <p className="text-xs text-slate-400 font-medium">Net Savings</p>
-              <p className={`text-base font-bold ${stats.savingsNet >= 0 ? 'text-brand-700' : 'text-red-600'}`}>AED {fmt(stats.savingsNet)}</p>
+              <p className={`text-base font-bold ${stats.savingsNet >= 0 ? 'text-brand-700' : 'text-red-600'} ${NUM}`}>AED {fmt(stats.savingsNet)}</p>
             </div>
           </div>
         </motion.div>
@@ -189,38 +198,18 @@ export default function DashboardPage() {
         }
       </motion.div>
 
-      {/* Savings Overview */}
+      {/* Spend Heatmap */}
       <motion.div variants={item} initial="hidden" animate="show" className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="font-heading font-bold text-slate-800">Self-Clearance Savings</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Agent fees saved minus fuel costs</p>
+            <h2 className="text-[15px] font-heading font-bold text-slate-800">Spend Activity</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Daily expense heatmap — last 12 months</p>
           </div>
-          <button onClick={() => navigate('/savings')} className="text-xs text-brand-600 font-semibold flex items-center gap-1">
-            Manage <ArrowRight className="w-3.5 h-3.5" />
-          </button>
         </div>
-        {loading ? <Skeleton className="h-20" /> : (
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-3 bg-brand-50 rounded-xl">
-              <p className="text-xs text-brand-600 font-semibold mb-1">GROSS SAVINGS</p>
-              <p className="text-xl font-bold font-heading text-brand-700">AED {fmt(stats?.savingsGross)}</p>
-              <p className="text-xs text-slate-400">Agent fees reduced</p>
-            </div>
-            <div className="text-center p-3 bg-orange-50 rounded-xl">
-              <p className="text-xs text-orange-600 font-semibold mb-1">FUEL COST</p>
-              <p className="text-xl font-bold font-heading text-orange-700">AED {fmt(stats?.fuelSpent)}</p>
-              <p className="text-xs text-slate-400">Self-clearance fuel</p>
-            </div>
-            <div className={`text-center p-3 rounded-xl ${(stats?.savingsNet || 0) >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
-              <p className={`text-xs font-semibold mb-1 ${(stats?.savingsNet || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>NET SAVINGS</p>
-              <p className={`text-xl font-bold font-heading ${(stats?.savingsNet || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-                AED {fmt(Math.abs(stats?.savingsNet))}
-              </p>
-              <p className="text-xs text-slate-400">Net benefit</p>
-            </div>
-          </div>
-        )}
+        {loading
+          ? <Skeleton className="h-20" />
+          : <SpendHeatmap data={stats?.dailySpend || []} />
+        }
       </motion.div>
     </div>
   );
