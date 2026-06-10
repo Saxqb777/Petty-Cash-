@@ -1,6 +1,7 @@
 const express = require('express');
 const ExcelJS = require('exceljs');
 const db = require('../db/database');
+const { addMoney } = require('../utils/money');
 
 const router = express.Router();
 
@@ -78,7 +79,7 @@ router.get('/', async (req, res) => {
     wb.created = now;
 
     const dateRange = (type === 'custom' && from && to) ? `${from} to ${to}` : type === 'this_month' ? thisYM : 'All Time';
-    const totalAED  = records.reduce((s, r) => s + (r.amount_aed || r.amount || 0), 0);
+    const totalAED  = addMoney(...records.map(r => r.amount_aed ?? r.amount ?? 0));
 
     // ═══════════════════════════════════════════════════════════════════════════
     // SHEET 1 — Summary  (clean 4-column grid: A label/name · B count · C amount · D %)
@@ -267,7 +268,7 @@ router.get('/', async (req, res) => {
       ws3.columns = shipCols.map(c => ({ key: c.key, width: c.width }));
       styleHeaderRow(ws3, shipCols.map(c => c.header));
 
-      let grandTotal = 0;
+      let grandTotalFils = 0;
       shippingRecs.forEach((rec, ri) => {
         const isEven = ri % 2 === 0;
         const bls   = rec.bl_numbers?.length ? rec.bl_numbers.join(', ') : (rec.bl_number || '');
@@ -285,7 +286,7 @@ router.get('/', async (req, res) => {
           const am = row.getCell('amount'); am.numFmt = MONEY; align(am, 'right', 'middle'); font(am, { size: 10, color: C.green });
           align(row.getCell('nConts'), 'center'); align(row.getCell('port'), 'center'); align(row.getCell('ie'), 'center');
           row.height = 18;
-          grandTotal += rec.amount_aed || rec.amount || 0;
+          grandTotalFils += Math.round((rec.amount_aed ?? rec.amount ?? 0) * 100);
         } else {
           charges.forEach((li, i) => {
             const row = ws3.addRow({ ...headerInfo(i), charge: li.label || li.name || 'Charge', amount: fmtMoney(li.amount) });
@@ -294,17 +295,17 @@ router.get('/', async (req, res) => {
             align(row.getCell('nConts'), 'center'); align(row.getCell('port'), 'center'); align(row.getCell('ie'), 'center');
             row.height = i === 0 ? 19 : 17;
           });
-          const billAmt = rec.amount_aed || rec.amount || 0;
+          const billAmt = rec.amount_aed ?? rec.amount ?? 0;
           const subTot = ws3.addRow({ charge: 'Bill Total', amount: fmtMoney(billAmt) });
           subTot.eachCell(cell => { fill(cell, C.brandLt); font(cell, { bold: true, size: 10, color: C.green }); });
           align(subTot.getCell('charge'), 'right', 'middle');
           const sa = subTot.getCell('amount'); sa.numFmt = MONEY; align(sa, 'right', 'middle');
           subTot.height = 18;
-          grandTotal += billAmt;
+          grandTotalFils += Math.round(billAmt * 100);
         }
       });
 
-      const gRow = ws3.addRow({ vendor: 'GRAND TOTAL', amount: fmtMoney(grandTotal) });
+      const gRow = ws3.addRow({ vendor: 'GRAND TOTAL', amount: fmtMoney(grandTotalFils / 100) });
       gRow.eachCell(cell => { fill(cell, C.brandDk); font(cell, { bold: true, size: 11, color: C.white }); align(cell, 'left', 'middle'); });
       const ga = gRow.getCell('amount'); ga.numFmt = MONEY; align(ga, 'right', 'middle');
       gRow.height = 26;
@@ -368,14 +369,14 @@ router.get('/', async (req, res) => {
           row.height = 18;
         });
 
-        const mt = recs.reduce((a, x) => ({ old: a.old + (x.old_fee || 0), new: a.new + (x.new_fee || 0), sav: a.sav + (x.savings || 0) }), { old: 0, new: 0, sav: 0 });
+        const mt = { old: addMoney(...recs.map(x => x.old_fee || 0)), new: addMoney(...recs.map(x => x.new_fee || 0)), sav: addMoney(...recs.map(x => x.savings || 0)) };
         const mRow = ws4.addRow({ date: 'Month Total', old: fmtMoney(mt.old), new: fmtMoney(mt.new), sav: fmtMoney(mt.sav) });
         mRow.eachCell(cell => { fill(cell, C.brandLt); font(cell, { bold: true, color: C.green }); align(cell, 'left', 'middle'); });
         moneyCols.forEach(k => { mRow.getCell(k).numFmt = MONEY; align(mRow.getCell(k), 'right', 'middle'); });
         mRow.height = 20;
       });
 
-      const gt = savingsRecords.reduce((a, x) => ({ old: a.old + (x.old_fee || 0), new: a.new + (x.new_fee || 0), sav: a.sav + (x.savings || 0) }), { old: 0, new: 0, sav: 0 });
+      const gt = { old: addMoney(...savingsRecords.map(x => x.old_fee || 0)), new: addMoney(...savingsRecords.map(x => x.new_fee || 0)), sav: addMoney(...savingsRecords.map(x => x.savings || 0)) };
       const gRow = ws4.addRow({ date: 'GRAND TOTAL', old: fmtMoney(gt.old), new: fmtMoney(gt.new), sav: fmtMoney(gt.sav) });
       gRow.eachCell(cell => { fill(cell, C.brandDk); font(cell, { bold: true, size: 11, color: C.white }); align(cell, 'left', 'middle'); });
       moneyCols.forEach(k => { gRow.getCell(k).numFmt = MONEY; align(gRow.getCell(k), 'right', 'middle'); });

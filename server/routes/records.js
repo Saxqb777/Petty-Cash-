@@ -1,15 +1,21 @@
 const express = require('express');
 const db = require('../db/database');
+const { convertToAed, addMoney, fromFils, toFils } = require('../utils/money');
 
 const router = express.Router();
 
-function getRate(currency) {
-  if (!currency || currency === 'AED') return 1;
+const SUPPORTED_CURRENCIES = ['AED','USD','EUR','GBP','SAR','QAR','KWD','OMR','INR'];
+
+function getRates() {
   try {
     const row = db.prepare("SELECT value FROM settings WHERE key = 'exchange_rates'").get();
-    const rates = JSON.parse(row?.value || '{}');
-    return rates[currency] || 1;
-  } catch { return 1; }
+    return { AED: 1, ...JSON.parse(row?.value || '{}') };
+  } catch { return { AED: 1 }; }
+}
+
+function getRate(currency) {
+  if (!currency || currency === 'AED') return 1;
+  return getRates()[currency] || 1;
 }
 
 const parseRecord = (r) => {
@@ -77,7 +83,7 @@ router.post('/', (req, res) => {
     const {
       expense_type = 'general', invoice_number, vendor_name, amount, currency = 'AED', date,
       category, business_unit, payment_method = 'Cash', purpose, submitted_by,
-      line_items = [], notes, image_path,
+      line_items = [], notes, image_path, file_hash,
       bl_number, container_number, port, shipment_type,
       container_numbers = [], bl_numbers = [],
       savings_old_fee, savings_previous_agent, savings_record = false,
@@ -100,32 +106,65 @@ router.post('/', (req, res) => {
     // Sanitize strings
     const clean = (s, max = 500) => (s || '').toString().trim().slice(0, max) || null;
 
-    // Duplicate detection — same invoice + vendor + amount + date
+    // Duplicate detection (three tiers):
+    // 1. Exact file hash match → hard reject
+    if (file_hash) {
+      const hashDupe = db.prepare('SELECT id, vendor_name, date FROM expenses WHERE file_hash = ?').get(file_hash);
+      if (hashDupe) return res.status(409).json({
+        error: `Duplicate: this exact receipt file was already recorded (Record #${hashDupe.id})`,
+        existingId: hashDupe.id, duplicateType: 'file'
+      });
+    }
+    // 2. Invoice number + vendor + date + amount → hard reject
     if (invoice_number) {
-      const dupe = db.prepare(
+      const invDupe = db.prepare(
         'SELECT id FROM expenses WHERE invoice_number=? AND vendor_name=? AND date=? AND amount=?'
       ).get(invoice_number, vendor_name, date, parsedAmount);
-      if (dupe) return res.status(409).json({ error: `Duplicate: this bill was already recorded (Record #${dupe.id})`, existingId: dupe.id });
+      if (invDupe) return res.status(409).json({
+        error: `Duplicate: invoice already recorded (Record #${invDupe.id})`,
+        existingId: invDupe.id, duplicateType: 'invoice'
+      });
+    }
+    // 3. No invoice number: same vendor+date+amount → soft warning (returned as 200 with warning flag)
+    let softDuplicateWarning = null;
+    if (!invoice_number) {
+      const softDupe = db.prepare(
+        'SELECT id FROM expenses WHERE (invoice_number IS NULL OR invoice_number = \'\') AND vendor_name=? AND date=? AND amount=?'
+      ).get(vendor_name, date, parsedAmount);
+      if (softDupe) softDuplicateWarning = { existingId: softDupe.id, message: `A similar expense (same vendor, date, amount) already exists as Record #${softDupe.id}. Saved anyway — verify it is not a duplicate.` };
     }
 
-    const rate = getRate(currency);
-    const amount_aed = parsedAmount * rate;
+    // AED conversion rules: AED forces rate=1; foreign currency must be in supported list
+    const cleanCurrency = (clean(currency, 10) || 'AED').toUpperCase();
+    let rate, amount_aed;
+    if (cleanCurrency === 'AED') {
+      rate = 1;
+      amount_aed = parsedAmount;
+    } else {
+      const rates = getRates();
+      if (!rates[cleanCurrency]) {
+        return res.status(400).json({ error: `Unsupported currency: ${cleanCurrency}. Supported: ${SUPPORTED_CURRENCIES.join(', ')}` });
+      }
+      rate = rates[cleanCurrency];
+      amount_aed = convertToAed(parsedAmount, rate);
+    }
 
     const doInsert = db.transaction(() => {
       const result = db.prepare(`
         INSERT INTO expenses (expense_type, invoice_number, vendor_name, amount, currency, date,
           category, business_unit, payment_method, purpose, submitted_by, line_items, notes,
           image_path, bl_number, container_number, port, shipment_type,
-          amount_aed, exchange_rate, container_numbers, bl_numbers)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          amount_aed, exchange_rate, container_numbers, bl_numbers, file_hash)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        clean(expense_type, 50) || 'general', clean(invoice_number, 100), clean(vendor_name, 255), parsedAmount, clean(currency, 10) || 'AED', date,
+        clean(expense_type, 50) || 'general', clean(invoice_number, 100), clean(vendor_name, 255), parsedAmount, cleanCurrency, date,
         clean(category, 100), clean(business_unit, 50), clean(payment_method, 50) || 'Cash', clean(purpose), clean(submitted_by, 100),
         JSON.stringify(line_items), clean(notes, 1000), image_path || null,
         bl_number || null, container_number || null, port || null, shipment_type || null,
         amount_aed, rate,
         JSON.stringify(Array.isArray(container_numbers) ? container_numbers : []),
-        JSON.stringify(Array.isArray(bl_numbers) ? bl_numbers : [])
+        JSON.stringify(Array.isArray(bl_numbers) ? bl_numbers : []),
+        file_hash || null
       );
 
       const expenseId = result.lastInsertRowid;
@@ -133,10 +172,11 @@ router.post('/', (req, res) => {
       // Auto-create savings record for shipping bills when old fee is provided
       if (expense_type === 'shipping' && savings_record && savings_old_fee != null) {
         const parsedItems = Array.isArray(line_items) ? line_items : [];
-        // new_fee = total bill paid (what you now pay instead of the old agent covering everything)
-        const new_fee = parsedItems.reduce((s, li) => s + (parseFloat(li.amount) || 0), 0) || parseFloat(amount) || 0;
+        const new_fee = parsedItems.length
+          ? addMoney(...parsedItems.map(li => li.amount))
+          : parsedAmount;
         const old_fee = parseFloat(savings_old_fee) || 0;
-        const savings = old_fee - new_fee;
+        const savings = addMoney(old_fee, -new_fee);
         const bls = Array.isArray(bl_numbers) && bl_numbers.length ? bl_numbers : bl_number ? [bl_number] : [];
 
         // Delete any existing savings record linked to this expense (in case of re-save)
@@ -161,7 +201,8 @@ router.post('/', (req, res) => {
     });
 
     const expenseId = doInsert();
-    res.status(201).json(parseRecord(db.prepare('SELECT * FROM expenses WHERE id = ?').get(expenseId)));
+    const saved = parseRecord(db.prepare('SELECT * FROM expenses WHERE id = ?').get(expenseId));
+    res.status(201).json({ ...saved, warning: softDuplicateWarning || undefined });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -174,10 +215,10 @@ router.put('/:id', (req, res) => {
     if (!ex) return res.status(404).json({ error: 'Record not found' });
     const b = req.body;
 
-    const newCurrency = b.currency ?? ex.currency;
+    const newCurrency = (b.currency ?? ex.currency ?? 'AED').toUpperCase();
     const newAmount = b.amount !== undefined ? parseFloat(b.amount) : ex.amount;
-    const rate = getRate(newCurrency);
-    const amount_aed = newAmount * rate;
+    const rate = newCurrency === 'AED' ? 1 : getRate(newCurrency);
+    const amount_aed = newCurrency === 'AED' ? newAmount : convertToAed(newAmount, rate);
 
     const newContainerNumbers = b.container_numbers !== undefined
       ? JSON.stringify(Array.isArray(b.container_numbers) ? b.container_numbers : [])
