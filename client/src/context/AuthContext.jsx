@@ -5,10 +5,22 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(undefined); // undefined = loading, null = not authed
 
+  const flattenUser = (data) => {
+    if (!data) return null;
+    const active = data.memberships?.find(m => m.status === 'active');
+    return {
+      ...data,
+      role: active?.role ?? null,
+      org_id: active?.org_id ?? null,
+      org_name: active?.org_name ?? null,
+      accent_color: active?.accent_color ?? null,
+    };
+  };
+
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
-      .then(data => setUser(data))
+      .then(data => setUser(flattenUser(data)))
       .catch(() => setUser(null));
   }, []);
 
@@ -20,9 +32,8 @@ export function AuthProvider({ children }) {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error);
-    // Refresh user
     const me = await fetch('/api/auth/me', { credentials: 'include' }).then(x => x.json());
-    setUser(me);
+    setUser(flattenUser(me));
     return data;
   };
 
@@ -33,7 +44,7 @@ export function AuthProvider({ children }) {
 
   const refreshUser = async () => {
     const me = await fetch('/api/auth/me', { credentials: 'include' }).then(x => x.ok ? x.json() : null);
-    setUser(me);
+    setUser(flattenUser(me));
   };
 
   return (
