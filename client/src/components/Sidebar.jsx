@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Table2, Settings, Leaf, PiggyBank, Users, LogOut, Layers } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Table2, Settings, PiggyBank, Users, LogOut, Layers, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const ROLE_RANK = { member: 1, finance: 2, admin: 3, owner: 4 };
@@ -23,49 +23,44 @@ export default function Sidebar() {
   );
 
   return (
-    <aside className="w-64 min-h-screen flex flex-col flex-shrink-0 bg-[#0d1117] border-r border-white/[0.06]">
-      {/* Logo */}
-      <div className="px-5 pt-6 pb-5 border-b border-white/[0.06]">
-        <div className="flex items-center gap-3">
-          <div className="relative w-11 h-11">
-            <div className="absolute inset-0 bg-brand-500 rounded-full opacity-25 blur-md" />
-            <div className="relative w-11 h-11 bg-gradient-to-br from-brand-400 to-brand-600 rounded-full flex items-center justify-center shadow-glow-sm ring-1 ring-white/10">
-              <Leaf className="w-[22px] h-[22px] text-white" strokeWidth={2.2} />
-            </div>
+    <aside className="w-60 min-h-screen flex flex-col flex-shrink-0 bg-paper-200 border-r border-paper-400">
+      {/* Brand */}
+      <div className="px-4 pt-5 pb-4 border-b border-paper-400">
+        <div className="flex items-center gap-2.5 mb-3">
+          <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <span className="text-white text-[13px] font-bold font-heading tracking-tight">DL</span>
           </div>
-          <div className="leading-none">
-            <p className="text-white font-bold text-[19px] font-heading tracking-tight lowercase">{user?.org_name?.toLowerCase() || 'agthia'}</p>
-            <p className="text-brand-400 text-[10px] font-semibold tracking-[0.2em] uppercase mt-1">Petty Cash</p>
-          </div>
+          <span className="text-ink-900 font-heading font-bold text-[17px] tracking-tight">Doc Ledger</span>
         </div>
+        {user?.org_name && (
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-paper-300 border border-paper-400 rounded text-[11px] font-medium text-ink-500">
+            <Building2 className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{user.org_name}</span>
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-5 space-y-0.5">
-        <p className="text-white/20 text-[10px] font-bold uppercase tracking-[0.15em] px-3 mb-3">Menu</p>
+      <nav className="flex-1 px-3 py-3 space-y-0.5">
         {visibleNav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-200 group ${
+              `relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 ${
                 isActive
-                  ? 'bg-white/[0.08] text-white'
-                  : 'text-white/40 hover:bg-white/[0.04] hover:text-white/80'
+                  ? 'bg-white border border-paper-400 shadow-card text-ink-900'
+                  : 'text-ink-500 hover:bg-paper-300 hover:text-ink-800'
               }`
             }
           >
             {({ isActive }) => (
               <>
                 {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-brand-400 rounded-r-full" />
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-brand-500 rounded-r-full" />
                 )}
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
-                  isActive ? 'bg-brand-500/20' : 'group-hover:bg-white/[0.06]'
-                }`}>
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-brand-400' : ''}`} />
-                </div>
+                <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-brand-600' : 'text-ink-400'}`} />
                 {label}
               </>
             )}
@@ -74,17 +69,17 @@ export default function Sidebar() {
       </nav>
 
       {/* User + logout */}
-      <div className="px-3 pb-3 border-t border-white/[0.06] pt-3">
+      <div className="px-3 pb-3 border-t border-paper-400 pt-3">
         {user && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl">
-            <div className="w-7 h-7 rounded-full bg-brand-500/20 flex items-center justify-center text-brand-400 text-xs font-bold flex-shrink-0">
+          <div className="flex items-center gap-2 px-2 py-2 rounded-lg">
+            <div className="w-7 h-7 rounded-lg bg-brand-100 flex items-center justify-center text-brand-700 text-xs font-bold flex-shrink-0">
               {user.full_name?.[0]?.toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white/70 text-xs font-medium truncate">{user.full_name}</p>
-              <p className="text-white/30 text-[10px] truncate capitalize">{user.role}</p>
+              <p className="text-ink-800 text-xs font-semibold truncate">{user.full_name}</p>
+              <p className="text-ink-400 text-[10px] truncate capitalize">{user.role}</p>
             </div>
-            <button onClick={logout} className="text-white/20 hover:text-white/60 transition-colors p-1" title="Sign out">
+            <button onClick={logout} className="text-ink-300 hover:text-ink-700 transition-colors p-1 rounded" title="Sign out">
               <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -92,10 +87,8 @@ export default function Sidebar() {
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-3 border-t border-white/[0.06]">
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-brand-500/10 border border-brand-500/20 rounded text-brand-400 text-[10px] font-mono font-medium">
-          v2.0.0
-        </span>
+      <div className="px-5 py-2.5 border-t border-paper-400">
+        <span className="text-ink-300 text-[10px] font-mono">v2.0.0</span>
       </div>
     </aside>
   );

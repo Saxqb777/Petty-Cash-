@@ -54,8 +54,8 @@ export default function DashboardPage() {
         className="flex items-center justify-between mb-7"
       >
         <div>
-          <h1 className="text-2xl font-heading font-bold text-slate-900 tracking-tight">Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-0.5 font-medium">{monthName}</p>
+          <h1 className="text-2xl font-heading font-bold text-ink-900 tracking-tight">Dashboard</h1>
+          <p className="text-sm text-ink-400 mt-0.5 font-medium">{monthName}</p>
         </div>
         <div className="flex gap-2">
           <button onClick={load} className="btn-secondary flex items-center gap-2 text-sm">
@@ -68,14 +68,14 @@ export default function DashboardPage() {
       </motion.div>
 
       {error && (
-        <div className="mb-5 p-4 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">{error}</div>
+        <div className="mb-5 p-4 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600">{error}</div>
       )}
 
-      {/* Hero + secondary stats */}
+      {/* Stats row */}
       {loading ? (
         <div className="grid grid-cols-4 gap-4 mb-5">
           <Skeleton className="col-span-2 h-36" />
-          {[0,1].map(i => <Skeleton key={i} className="h-36" />)}
+          {[0, 1].map(i => <Skeleton key={i} className="h-36" />)}
         </div>
       ) : (
         <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-4 gap-4 mb-5">
@@ -114,7 +114,7 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {/* Charts Row */}
+      {/* Charts row */}
       <motion.div
         variants={container} initial="hidden" animate="show"
         className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-5"
@@ -122,8 +122,8 @@ export default function DashboardPage() {
         <motion.div variants={item} className="card p-5 lg:col-span-3">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="text-[15px] font-heading font-bold text-slate-800">Monthly Spend</h2>
-              <p className="text-xs text-slate-400 mt-0.5">Last 6 months</p>
+              <h2 className="text-[15px] font-heading font-bold text-ink-800">Monthly Spend</h2>
+              <p className="text-xs text-ink-400 mt-0.5">Last 6 months</p>
             </div>
           </div>
           {loading ? <Skeleton className="h-52" /> : <MonthlyBarChart data={stats?.monthlyTrend || []} />}
@@ -131,8 +131,8 @@ export default function DashboardPage() {
 
         <motion.div variants={item} className="card p-5 lg:col-span-2">
           <div className="mb-4">
-            <h2 className="text-[15px] font-heading font-bold text-slate-800">By Category</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Spend distribution</p>
+            <h2 className="text-[15px] font-heading font-bold text-ink-800">By Category</h2>
+            <p className="text-xs text-ink-400 mt-0.5">Spend distribution</p>
           </div>
           {loading ? <Skeleton className="h-52" /> : <CategoryDonutChart data={stats?.categoryBreakdown || []} />}
         </motion.div>
@@ -141,7 +141,7 @@ export default function DashboardPage() {
       {/* Needs-review alert */}
       {!loading && stats?.needsReviewCount > 0 && (
         <motion.div variants={item}
-          className="mb-5 p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 cursor-pointer hover:bg-amber-100 transition-colors"
+          className="mb-5 p-3.5 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3 cursor-pointer hover:bg-amber-100 transition-colors"
           onClick={() => navigate('/records')}>
           <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
           <p className="text-sm text-amber-800 font-medium">
@@ -151,24 +151,24 @@ export default function DashboardPage() {
         </motion.div>
       )}
 
-      {/* Savings Strip */}
+      {/* Savings strip */}
       {!loading && stats && stats.savingsGross > 0 && (
         <motion.div variants={item} className="grid grid-cols-2 gap-4 mb-5">
           <div className="card p-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
               <PiggyBank className="w-4 h-4 text-emerald-600" />
             </div>
             <div>
-              <p className="text-xs text-slate-400 font-medium">Gross Clearance Savings</p>
-              <p className={`text-base font-bold text-slate-800 ${NUM}`}>AED {fmt(stats.savingsGross)}</p>
+              <p className="text-xs text-ink-400 font-medium">Gross Clearance Savings</p>
+              <p className={`text-base font-bold text-ink-900 ${NUM}`}>AED {fmt(stats.savingsGross)}</p>
             </div>
           </div>
-          <div className="card p-4 flex items-center gap-3 border-brand-200 bg-brand-50/30">
-            <div className="w-9 h-9 rounded-xl bg-brand-100 flex items-center justify-center flex-shrink-0">
+          <div className="card p-4 flex items-center gap-3 border-l-[3px] border-l-brand-500">
+            <div className="w-9 h-9 rounded-lg bg-brand-100 flex items-center justify-center flex-shrink-0">
               <TrendingUp className="w-4 h-4 text-brand-600" />
             </div>
             <div>
-              <p className="text-xs text-slate-400 font-medium">Net Savings</p>
+              <p className="text-xs text-ink-400 font-medium">Net Savings</p>
               <p className={`text-base font-bold ${stats.savingsNet >= 0 ? 'text-brand-700' : 'text-red-600'} ${NUM}`}>AED {fmt(stats.savingsNet)}</p>
             </div>
           </div>
@@ -182,8 +182,8 @@ export default function DashboardPage() {
       >
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-[15px] font-heading font-bold text-slate-800">Recent Transactions</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Latest expense activity</p>
+            <h2 className="text-[15px] font-heading font-bold text-ink-800">Recent Transactions</h2>
+            <p className="text-xs text-ink-400 mt-0.5">Latest expense activity</p>
           </div>
           <button
             onClick={() => navigate('/records')}
@@ -202,8 +202,8 @@ export default function DashboardPage() {
       <motion.div variants={item} initial="hidden" animate="show" className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-[15px] font-heading font-bold text-slate-800">Spend Activity</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Daily expense heatmap — last 12 months</p>
+            <h2 className="text-[15px] font-heading font-bold text-ink-800">Spend Activity</h2>
+            <p className="text-xs text-ink-400 mt-0.5">Daily expense heatmap — last 12 months</p>
           </div>
         </div>
         {loading

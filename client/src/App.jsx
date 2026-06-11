@@ -53,8 +53,8 @@ function AppShell() {
   // Still loading auth state
   if (user === undefined) {
     return (
-      <div className="min-h-screen bg-[#0d1117] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
+      <div className="min-h-screen bg-paper-100 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
       </div>
     );
   }
@@ -84,7 +84,7 @@ function AppShell() {
   if (!active) return <Navigate to="/pending" replace />;
 
   return (
-    <div className="flex min-h-screen bg-[#0d1117]">
+    <div className="flex min-h-screen bg-paper-100">
       <Sidebar />
       <main className="flex-1 overflow-auto">
         <AnimatedRoutes />
