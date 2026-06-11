@@ -14,6 +14,7 @@ export function AuthProvider({ children }) {
       org_id: active?.org_id ?? null,
       org_name: active?.org_name ?? null,
       accent_color: active?.accent_color ?? null,
+      is_superadmin: !!data.is_superadmin,
     };
   };
 

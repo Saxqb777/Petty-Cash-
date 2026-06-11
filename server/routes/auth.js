@@ -170,7 +170,9 @@ router.get('/me', requireAuthAny, (req, res) => {
      WHERE m.user_id = ?`
   ).all(req.user.id);
 
-  res.json({ ...req.user, memberships });
+  const userRow = db.prepare('SELECT is_superadmin FROM users WHERE id = ?').get(req.user.id);
+
+  res.json({ ...req.user, memberships, is_superadmin: !!userRow?.is_superadmin });
 });
 
 // ── GET /auth/orgs — list orgs for join dropdown ──────────────────────────────

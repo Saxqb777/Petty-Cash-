@@ -37,6 +37,7 @@ const savingsRouter = require('./routes/savings');
 const authRouter         = require('./routes/auth');
 const membersRouter      = require('./routes/members');
 const expenseTypesRouter = require('./routes/expense-types');
+const platformRouter     = require('./routes/platform');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -80,6 +81,7 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 app.use('/api/auth',          authRouter);
 app.use('/api/members',       membersRouter);
 app.use('/api/expense-types', expenseTypesRouter);
+app.use('/api/platform',      platformRouter);
 app.use('/api/records',  recordsRouter);
 app.use('/api/upload',   uploadRouter);
 app.use('/api/export',   exportRouter);

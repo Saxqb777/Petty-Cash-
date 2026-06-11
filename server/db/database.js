@@ -99,6 +99,12 @@ db.exec(`
 // ── More migrations (after tables exist) ─────────────────────────────────────
 migrate(`ALTER TABLE clearance_savings ADD COLUMN expense_id INTEGER REFERENCES expenses(id)`);
 migrate(`ALTER TABLE clearance_savings ADD COLUMN org_id INTEGER REFERENCES organizations(id)`);
+migrate(`ALTER TABLE users ADD COLUMN is_superadmin INTEGER DEFAULT 0`);
+
+// ── Promote platform owner (idempotent — only matches if the user exists) ────
+try {
+  db.prepare(`UPDATE users SET is_superadmin = 1 WHERE email = ?`).run('saaqibkhan58@gmail.com');
+} catch (_) {}
 
 // ── Settings table migration: legacy (key PK) → multi-tenant (key+org_id PK) ──
 // SQLite cannot ALTER a primary key, so we rebuild the table if it's the old shape.

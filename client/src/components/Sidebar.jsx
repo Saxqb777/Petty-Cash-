@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Table2, Settings, PiggyBank, Users, LogOut, Layers, Building2 } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Table2, Settings, PiggyBank, Users, LogOut, Layers, Building2, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const ROLE_RANK = { member: 1, finance: 2, admin: 3, owner: 4 };
@@ -22,6 +22,8 @@ export default function Sidebar() {
     !item.minRole || (ROLE_RANK[userRole] || 0) >= (ROLE_RANK[item.minRole] || 0)
   );
 
+  const isSuperadmin = !!user?.is_superadmin;
+
   return (
     <aside className="w-60 min-h-screen flex flex-col flex-shrink-0 bg-paper-200 border-r border-paper-400">
       {/* Brand */}
@@ -42,6 +44,22 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-3 space-y-0.5">
+        {isSuperadmin && (
+          <NavLink
+            to="/platform"
+            className={({ isActive }) =>
+              `relative flex items-center gap-2.5 px-3 py-2 mb-1 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+                isActive
+                  ? 'bg-violet-50 border border-violet-200 text-violet-700'
+                  : 'bg-paper-300/60 border border-paper-400 text-ink-700 hover:bg-violet-50 hover:border-violet-200 hover:text-violet-700'
+              }`
+            }
+          >
+            <ShieldAlert className="w-4 h-4 flex-shrink-0" />
+            Platform
+            <span className="ml-auto text-[9px] font-bold uppercase tracking-widest text-violet-600">Owner</span>
+          </NavLink>
+        )}
         {visibleNav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}

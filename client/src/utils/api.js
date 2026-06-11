@@ -75,4 +75,11 @@ export const api = {
   },
   getSavingByExpense: (expenseId) => request(`/savings/by-expense/${expenseId}`),
   updateSaving: (id, data) => request(`/savings/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Platform owner
+  getPlatformOverview: () => request('/platform/overview'),
+  getPlatformOrgs:     () => request('/platform/orgs'),
+  getPlatformOrg:      (id) => request(`/platform/orgs/${id}`),
+  updatePlatformOrg:   (id, data) => request(`/platform/orgs/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePlatformOrg:   (id) => request(`/platform/orgs/${id}`, { method: 'DELETE' }),
 };
