@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
 
 export default function SignupPage() {
   const { showToast } = useToast();
+  const { refreshUser } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [orgs, setOrgs] = useState([]);
@@ -45,6 +47,7 @@ export default function SignupPage() {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error);
+      await refreshUser();
       if (data.status === 'pending') navigate('/pending');
       else navigate('/');
     } catch (err) {
