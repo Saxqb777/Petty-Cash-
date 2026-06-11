@@ -26,13 +26,13 @@ const DEFAULT_RATES = { USD: 3.6725, EUR: 4.02, GBP: 4.68, SAR: 0.98, QAR: 1.01,
 function Section({ icon: Icon, title, description, children }) {
   return (
     <div className="card p-6">
-      <div className="flex items-start gap-3 mb-5 pb-5 border-b border-slate-100">
-        <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center flex-shrink-0">
-          <Icon className="w-4.5 h-[18px] text-brand-600" />
+      <div className="flex items-start gap-3 mb-5 pb-5 border-b border-paper-400">
+        <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center flex-shrink-0">
+          <Icon className="w-[18px] h-[18px] text-brand-600" />
         </div>
         <div>
-          <h3 className="font-heading font-bold text-slate-800 text-[15px]">{title}</h3>
-          <p className="text-xs text-slate-400 mt-0.5">{description}</p>
+          <h3 className="font-heading font-bold text-ink-800 text-[15px]">{title}</h3>
+          <p className="text-xs text-ink-400 mt-0.5">{description}</p>
         </div>
       </div>
       {children}
@@ -50,9 +50,9 @@ function TagList({ items, onRemove, onAdd, placeholder }) {
     <div>
       <div className="flex flex-wrap gap-2 mb-3">
         {items.map(item => (
-          <span key={item} className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium">
+          <span key={item} className="inline-flex items-center gap-1.5 px-3 py-1 bg-paper-300 text-ink-700 border border-paper-400 rounded text-sm font-medium">
             {item}
-            <button onClick={() => onRemove(item)} className="text-slate-400 hover:text-red-500 transition-colors">
+            <button onClick={() => onRemove(item)} className="text-ink-400 hover:text-red-500 transition-colors">
               <X className="w-3 h-3" />
             </button>
           </span>
@@ -147,7 +147,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-3xl mx-auto flex items-center gap-3 text-slate-400">
+      <div className="p-6 max-w-3xl mx-auto flex items-center gap-3 text-ink-400">
         <RefreshCw className="w-4 h-4 animate-spin" /> Loading settings...
       </div>
     );
@@ -159,8 +159,8 @@ export default function SettingsPage() {
       <motion.div initial={{ opacity:0,y:-8 }} animate={{ opacity:1,y:0 }} transition={{ duration:0.3 }}
         className="flex items-center justify-between mb-7">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-slate-900 tracking-tight">Settings</h1>
-          <p className="text-sm text-slate-400 mt-0.5 font-medium">Configure your petty cash workspace</p>
+          <h1 className="text-2xl font-heading font-bold text-ink-900 tracking-tight">Settings</h1>
+          <p className="text-sm text-ink-400 mt-0.5 font-medium">Configure your petty cash workspace</p>
         </div>
         <button onClick={save} disabled={saving} className="btn-primary flex items-center gap-2 text-sm">
           {saving
@@ -172,7 +172,7 @@ export default function SettingsPage() {
       </motion.div>
 
       {error && (
-        <div className="mb-5 p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">{error}</div>
+        <div className="mb-5 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600">{error}</div>
       )}
 
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
@@ -227,7 +227,7 @@ export default function SettingsPage() {
                 <label className="label">Approval Threshold (AED)</label>
                 <input className="input" type="number" min="0" value={cfg.approvalThreshold}
                   onChange={e => set('approvalThreshold', e.target.value)} placeholder="e.g. 500" />
-                <p className="text-xs text-slate-400 mt-1">Expenses above this amount are flagged for review</p>
+                <p className="text-xs text-ink-400 mt-1">Expenses above this amount are flagged for review</p>
               </div>
             </div>
           </Section>
@@ -239,8 +239,8 @@ export default function SettingsPage() {
             <div className="grid grid-cols-2 gap-3">
               {CURRENCIES.map(cur => (
                 <div key={cur} className="flex items-center gap-3">
-                  <span className="text-sm font-semibold text-slate-600 w-10">1 {cur}</span>
-                  <span className="text-slate-400 text-sm">=</span>
+                  <span className="text-sm font-semibold text-ink-600 w-10">1 {cur}</span>
+                  <span className="text-ink-400 text-sm">=</span>
                   <input
                     className="input flex-1 text-sm"
                     type="number"
@@ -250,11 +250,11 @@ export default function SettingsPage() {
                     onChange={e => setRate(cur, e.target.value)}
                     placeholder={String(DEFAULT_RATES[cur])}
                   />
-                  <span className="text-sm text-slate-500">AED</span>
+                  <span className="text-sm text-ink-500">AED</span>
                 </div>
               ))}
             </div>
-            <p className="text-xs text-slate-400 mt-3">These rates are used to calculate AED equivalents when recording foreign currency expenses.</p>
+            <p className="text-xs text-ink-400 mt-3">These rates are used to calculate AED equivalents when recording foreign currency expenses.</p>
           </Section>
         </motion.div>
 

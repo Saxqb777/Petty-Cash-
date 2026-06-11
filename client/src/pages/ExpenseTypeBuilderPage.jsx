@@ -186,10 +186,10 @@ export default function ExpenseTypeBuilderPage() {
     return (
       <div className="p-6 max-w-2xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500">
+          <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-lg hover:bg-paper-200 flex items-center justify-center text-ink-500">
             <X className="w-4 h-4" />
           </button>
-          <h1 className="text-xl font-bold text-gray-900">
+          <h1 className="text-xl font-bold text-ink-900">
             {editing === 'new' ? 'Create Custom Expense Type' : 'Edit Expense Type'}
           </h1>
         </div>
@@ -197,7 +197,7 @@ export default function ExpenseTypeBuilderPage() {
         <div className="space-y-6">
           {/* Basic info */}
           <div className="card p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-gray-700">Basic Information</h2>
+            <h2 className="text-sm font-semibold text-ink-700">Basic Information</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="label">Type Name</label>
@@ -208,7 +208,7 @@ export default function ExpenseTypeBuilderPage() {
                 <input className="input font-mono" value={form.slug}
                   onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') }))}
                   placeholder="hotel-accommodation" disabled={slugLocked} />
-                {slugLocked && <p className="text-xs text-gray-400 mt-1">Slug cannot be changed after creation</p>}
+                {slugLocked && <p className="text-xs text-ink-400 mt-1">Slug cannot be changed after creation</p>}
               </div>
               <div>
                 <label className="label">Description</label>
@@ -220,23 +220,23 @@ export default function ExpenseTypeBuilderPage() {
 
           {/* Icon + Color */}
           <div className="card p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-gray-700">Icon & Color</h2>
+            <h2 className="text-sm font-semibold text-ink-700">Icon & Color</h2>
             <div className="flex items-center gap-4 mb-2">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
+              <div className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: form.color + '1a' }}>
                 <SelectedIcon className="w-7 h-7" style={{ color: form.color }} />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700 mb-1">Preview</p>
-                <p className="text-xs text-gray-400">{form.name || 'Type name'}</p>
+                <p className="text-sm font-medium text-ink-700 mb-1">Preview</p>
+                <p className="text-xs text-ink-400">{form.name || 'Type name'}</p>
               </div>
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 mb-2">Icon</p>
+              <p className="text-xs font-medium text-ink-500 mb-2">Icon</p>
               <div className="flex flex-wrap gap-2">
                 {ICON_OPTIONS.map(({ key, Icon }) => (
                   <button key={key} onClick={() => setForm(f => ({ ...f, icon: key }))}
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${form.icon === key ? 'ring-2 ring-offset-1' : 'border border-gray-200 hover:border-gray-300'}`}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${form.icon === key ? 'ring-2 ring-offset-1' : 'border border-paper-400 hover:border-paper-500'}`}
                     style={form.icon === key ? { ringColor: form.color, backgroundColor: form.color + '1a' } : {}}>
                     <Icon className="w-4 h-4" style={form.icon === key ? { color: form.color } : { color: '#6b7280' }} />
                   </button>
@@ -244,7 +244,7 @@ export default function ExpenseTypeBuilderPage() {
               </div>
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-500 mb-2">Color</p>
+              <p className="text-xs font-medium text-ink-500 mb-2">Color</p>
               <div className="flex gap-2 flex-wrap">
                 {COLOR_OPTIONS.map(c => (
                   <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))}
@@ -257,8 +257,8 @@ export default function ExpenseTypeBuilderPage() {
 
           {/* AI Hints */}
           <div className="card p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-gray-700">AI Extraction Hints</h2>
-            <p className="text-xs text-gray-500">Tell the AI what kind of document this is so it extracts the right fields.</p>
+            <h2 className="text-sm font-semibold text-ink-700">AI Extraction Hints</h2>
+            <p className="text-xs text-ink-500">Tell the AI what kind of document this is so it extracts the right fields.</p>
             <textarea className="input resize-none" rows={3} value={form.ai_hints}
               onChange={e => setForm(f => ({ ...f, ai_hints: e.target.value }))}
               placeholder="e.g. Hotel invoice or booking confirmation. Look for check-in/check-out dates, room type, and number of nights." />
@@ -267,40 +267,40 @@ export default function ExpenseTypeBuilderPage() {
           {/* Fields */}
           <div className="card p-5 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-700">Form Fields</h2>
-              <p className="text-xs text-gray-400">Standard fields (vendor, amount, date) are always included</p>
+              <h2 className="text-sm font-semibold text-ink-700">Form Fields</h2>
+              <p className="text-xs text-ink-400">Standard fields (vendor, amount, date) are always included</p>
             </div>
 
             <div className="space-y-3">
               {form.fields.map((field, idx) => (
-                <div key={field.key} className="border border-gray-100 rounded-xl p-3 space-y-3 bg-gray-50/50">
+                <div key={field.key} className="border border-paper-400 rounded-lg p-3 space-y-3 bg-paper-100">
                   <div className="flex items-start gap-2">
                     <div className="flex flex-col gap-1 pt-1 flex-shrink-0">
-                      <button onClick={() => moveField(idx, -1)} className="text-gray-300 hover:text-gray-500 disabled:opacity-20" disabled={idx === 0}>
+                      <button onClick={() => moveField(idx, -1)} className="text-ink-300 hover:text-ink-500 disabled:opacity-20" disabled={idx === 0}>
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
                       </button>
-                      <button onClick={() => moveField(idx, 1)} className="text-gray-300 hover:text-gray-500 disabled:opacity-20" disabled={idx === form.fields.length - 1}>
+                      <button onClick={() => moveField(idx, 1)} className="text-ink-300 hover:text-ink-500 disabled:opacity-20" disabled={idx === form.fields.length - 1}>
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                       </button>
                     </div>
                     <div className="flex-1 grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-[11px] font-medium text-gray-500 block mb-1">Field Label</label>
+                        <label className="text-[11px] font-medium text-ink-500 block mb-1">Field Label</label>
                         <input className="input text-sm py-1.5" value={field.label}
                           onChange={e => updateField(idx, { label: e.target.value })} placeholder="e.g. Project Code" />
                       </div>
                       <div>
-                        <label className="text-[11px] font-medium text-gray-500 block mb-1">Field Type</label>
+                        <label className="text-[11px] font-medium text-ink-500 block mb-1">Field Type</label>
                         <div className="relative">
                           <select className="input appearance-none pr-8 text-sm py-1.5 cursor-pointer"
                             value={field.type} onChange={e => updateField(idx, { type: e.target.value, options: [] })}>
                             {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                           </select>
-                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-400 pointer-events-none" />
                         </div>
                       </div>
                       <div>
-                        <label className="text-[11px] font-medium text-gray-500 block mb-1">Placeholder (optional)</label>
+                        <label className="text-[11px] font-medium text-ink-500 block mb-1">Placeholder (optional)</label>
                         <input className="input text-sm py-1.5" value={field.placeholder}
                           onChange={e => updateField(idx, { placeholder: e.target.value })} placeholder="Hint text..." />
                       </div>
@@ -309,24 +309,24 @@ export default function ExpenseTypeBuilderPage() {
                           <input type="checkbox" checked={field.required}
                             onChange={e => updateField(idx, { required: e.target.checked })}
                             className="w-3.5 h-3.5 rounded accent-brand-600" />
-                          <span className="text-sm text-gray-600">Required</span>
+                          <span className="text-sm text-ink-600">Required</span>
                         </label>
                       </div>
                     </div>
-                    <button onClick={() => removeField(idx)} className="text-gray-200 hover:text-red-400 flex-shrink-0 mt-1">
+                    <button onClick={() => removeField(idx)} className="text-ink-200 hover:text-red-400 flex-shrink-0 mt-1">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
 
                   {field.type === 'select' && (
                     <div className="ml-5">
-                      <p className="text-[11px] font-medium text-gray-500 mb-1">Dropdown Options</p>
+                      <p className="text-[11px] font-medium text-ink-500 mb-1">Dropdown Options</p>
                       <div className="flex flex-wrap gap-1 mb-2">
                         {field.options.map(opt => (
-                          <span key={opt} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-gray-200 rounded text-xs text-gray-700">
+                          <span key={opt} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-paper-400 rounded text-xs text-ink-700">
                             {opt}
                             <button onClick={() => updateField(idx, { options: field.options.filter(o => o !== opt) })}
-                              className="text-gray-300 hover:text-red-400"><X className="w-2.5 h-2.5" /></button>
+                              className="text-ink-300 hover:text-red-400"><X className="w-2.5 h-2.5" /></button>
                           </span>
                         ))}
                       </div>
@@ -369,54 +369,55 @@ export default function ExpenseTypeBuilderPage() {
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-white text-xl font-semibold">Expense Types</h1>
-          <p className="text-white/40 text-sm mt-1">Manage the types of expenses your team can submit</p>
+          <h1 className="text-2xl font-heading font-bold text-ink-900 tracking-tight">Expense Types</h1>
+          <p className="text-sm text-ink-400 mt-0.5 font-medium">Manage the types of expenses your team can submit</p>
         </div>
-        <button onClick={startCreate} className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-xl transition-colors">
+        <button onClick={startCreate} className="btn-primary flex items-center gap-2 text-sm">
           <Plus className="w-4 h-4" /> New Type
         </button>
       </div>
 
       {loading ? (
-        <div className="text-white/40 text-sm">Loading…</div>
+        <div className="flex items-center gap-2 text-ink-400 text-sm">
+          <div className="w-4 h-4 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
+          Loading…
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="card overflow-hidden divide-y divide-paper-300">
           {types.map(type => {
             const IconComp = ICON_MAP[type.icon] || Receipt;
             return (
-              <div key={type.id} className="bg-slate-800/60 border border-white/[0.06] rounded-xl px-4 py-3 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: type.color + '1a' }}>
-                  <IconComp className="w-4.5 h-4.5" style={{ color: type.color }} />
+              <div key={type.id} className="px-4 py-3 flex items-center gap-3 hover:bg-paper-100 transition-colors">
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: type.color + '18' }}>
+                  <IconComp className="w-[18px] h-[18px]" style={{ color: type.color }} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-white text-sm font-medium">{type.name}</p>
+                    <p className="text-ink-800 text-sm font-semibold">{type.name}</p>
                     {type.is_builtin ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-white/[0.05] border border-white/[0.08] rounded text-white/40 text-[10px]">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-paper-300 border border-paper-400 rounded text-ink-400 text-[10px]">
                         <Lock className="w-2.5 h-2.5" /> Built-in
                       </span>
                     ) : (
-                      <span className="px-1.5 py-0.5 bg-brand-500/10 border border-brand-500/20 rounded text-brand-400 text-[10px]">Custom</span>
+                      <span className="px-1.5 py-0.5 bg-brand-100 border border-brand-200 rounded text-brand-700 text-[10px]">Custom</span>
                     )}
                   </div>
-                  <p className="text-white/40 text-xs truncate">{type.description || `${type.fields_schema?.length || 0} fields`}</p>
+                  <p className="text-ink-400 text-xs truncate">{type.description || `${type.fields_schema?.length || 0} fields`}</p>
                 </div>
                 {!type.is_builtin && (
                   <div className="flex items-center gap-1">
-                    <button onClick={() => startEdit(type)} className="p-1.5 text-white/30 hover:text-white/70 transition-colors" title="Edit">
+                    <button onClick={() => startEdit(type)} className="p-1.5 text-ink-300 hover:text-ink-700 transition-colors rounded" title="Edit">
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button onClick={() => setConfirm({ id: type.id, name: type.name })}
-                      className="p-1.5 text-white/30 hover:text-amber-400 transition-colors" title="Archive">
+                      className="p-1.5 text-ink-300 hover:text-amber-500 transition-colors rounded" title="Archive">
                       <Archive className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 )}
                 {type.is_builtin && (
-                  <div className="flex items-center">
-                    <Settings2 className="w-3.5 h-3.5 text-white/20" />
-                  </div>
+                  <Settings2 className="w-3.5 h-3.5 text-ink-300" />
                 )}
               </div>
             );
@@ -424,8 +425,8 @@ export default function ExpenseTypeBuilderPage() {
         </div>
       )}
 
-      <div className="bg-slate-800/30 border border-white/[0.04] rounded-xl p-4 text-xs text-white/40 space-y-1">
-        <p className="text-white/60 font-medium mb-2">About custom types</p>
+      <div className="card p-4 text-xs text-ink-500 space-y-1.5">
+        <p className="text-ink-700 font-semibold mb-2">About custom types</p>
         <p>Built-in types (Petrol, Shipping, General) have specialized forms and cannot be removed.</p>
         <p>Custom types use a dynamic form built from your field definitions, with AI extraction powered by your hints.</p>
       </div>

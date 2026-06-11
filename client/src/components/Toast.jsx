@@ -29,16 +29,16 @@ export function ToastProvider({ children }) {
         {toasts.map(t => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border text-sm font-medium animate-slide-up
-              ${t.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
-                t.type === 'error'   ? 'bg-red-50 border-red-200 text-red-800' :
-                                       'bg-white border-gray-200 text-gray-800'}`}
+            className={`pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-lg shadow-card-hover border text-sm font-medium animate-slide-up
+              ${t.type === 'success' ? 'bg-white border-emerald-200 text-emerald-800' :
+                t.type === 'error'   ? 'bg-white border-red-200 text-red-800' :
+                                       'bg-white border-paper-400 text-ink-800'}`}
           >
-            {t.type === 'success' && <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />}
+            {t.type === 'success' && <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />}
             {t.type === 'error'   && <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />}
             {t.type === 'info'    && <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />}
             <span className="flex-1 leading-snug">{t.message}</span>
-            <button onClick={() => remove(t.id)} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+            <button onClick={() => remove(t.id)} className="text-ink-300 hover:text-ink-600 flex-shrink-0 transition-colors">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
