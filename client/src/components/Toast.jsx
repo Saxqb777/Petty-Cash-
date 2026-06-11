@@ -17,9 +17,10 @@ export function ToastProvider({ children }) {
   const remove = useCallback((id) => setToasts(t => t.filter(x => x.id !== id)), []);
 
   const toast = {
-    success: (msg, dur) => add(msg, 'success', dur),
-    error:   (msg, dur) => add(msg, 'error',   dur || 6000),
-    info:    (msg, dur) => add(msg, 'info',     dur),
+    success:   (msg, dur) => add(msg, 'success', dur),
+    error:     (msg, dur) => add(msg, 'error',   dur || 6000),
+    info:      (msg, dur) => add(msg, 'info',    dur),
+    showToast: (msg, type = 'info', dur) => add(msg, type, type === 'error' ? (dur || 6000) : dur),
   };
 
   return (
