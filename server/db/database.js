@@ -77,13 +77,6 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT NOT NULL,
-    value TEXT NOT NULL,
-    org_id INTEGER REFERENCES organizations(id),
-    PRIMARY KEY (key, org_id)
-  );
-
   CREATE TABLE IF NOT EXISTS clearance_savings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT NOT NULL,
@@ -107,6 +100,36 @@ db.exec(`
 migrate(`ALTER TABLE clearance_savings ADD COLUMN expense_id INTEGER REFERENCES expenses(id)`);
 migrate(`ALTER TABLE clearance_savings ADD COLUMN org_id INTEGER REFERENCES organizations(id)`);
 
+// ── Settings table migration: legacy (key PK) → multi-tenant (key+org_id PK) ──
+// SQLite cannot ALTER a primary key, so we rebuild the table if it's the old shape.
+const settingsInfo = db.prepare(`PRAGMA table_info(settings)`).all();
+const hasSettingsTable = settingsInfo.length > 0;
+const hasOrgIdColumn = settingsInfo.some(c => c.name === 'org_id');
+
+if (!hasSettingsTable) {
+  db.exec(`
+    CREATE TABLE settings (
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      org_id INTEGER REFERENCES organizations(id),
+      PRIMARY KEY (key, org_id)
+    )
+  `);
+} else if (!hasOrgIdColumn) {
+  // Migrate: copy old rows into new table tagged with org_id=1 (Agthia)
+  db.exec(`
+    ALTER TABLE settings RENAME TO settings_old;
+    CREATE TABLE settings (
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      org_id INTEGER REFERENCES organizations(id),
+      PRIMARY KEY (key, org_id)
+    );
+    INSERT INTO settings (key, value, org_id) SELECT key, value, 1 FROM settings_old;
+    DROP TABLE settings_old;
+  `);
+}
+
 // ── Seed Agthia Group org (id=1) ─────────────────────────────────────────────
 db.prepare(`INSERT OR IGNORE INTO organizations (id, name, slug, accent_color) VALUES (1, 'Agthia Group', 'agthia', '#62833A')`).run();
 
@@ -124,11 +147,6 @@ try {
         '{"USD":3.6725,"EUR":4.02,"GBP":4.68,"SAR":0.98,"QAR":1.01,"KWD":11.96,"OMR":9.53,"INR":0.044}' as value
     )
   `);
-} catch (_) {}
-
-// ── Also seed the old keyless row for backwards compat during transition ──────
-try {
-  db.exec(`INSERT OR IGNORE INTO settings (key, value) VALUES ('exchange_rates', '{"USD":3.6725,"EUR":4.02,"GBP":4.68,"SAR":0.98,"QAR":1.01,"KWD":11.96,"OMR":9.53,"INR":0.044}')`);
 } catch (_) {}
 
 // ── Backfill amount_aed for old records ───────────────────────────────────────
