@@ -1,5 +1,4 @@
 const Anthropic = require('@anthropic-ai/sdk');
-const fs = require('fs');
 const path = require('path');
 const { addMoney } = require('./money');
 
@@ -14,9 +13,15 @@ const CATEGORIES = [
   'Accommodation & Travel', 'Medical', 'Miscellaneous'
 ];
 
+// Built lazily, per invocation — an env-var check at module load would blow up
+// a serverless cold start with an opaque error instead of a readable 500.
 function getClient() {
   const key = (process.env.ANTHROPIC_API_KEY || '').trim();
-  if (!key) throw new Error('ANTHROPIC_API_KEY is missing from your .env file');
+  if (!key) {
+    const err = new Error('ANTHROPIC_API_KEY is not set — AI extraction is unavailable.');
+    err.status = 500;
+    throw err;
+  }
   // The SDK retries 429 / 500 / 529 automatically with exponential backoff.
   // timeout is per-attempt; a slow multi-page PDF gets up to 90s before a retry.
   return new Anthropic({ apiKey: key, maxRetries: 4, timeout: 90_000 });
@@ -262,11 +267,24 @@ ${lines.join(',\n')}
 For any field you are uncertain about, add its key to the confidence object with value "low".`;
 }
 
-async function parseReceiptFile(filePath, originalName = '', expenseType = 'general', customSchema = null, aiHints = null) {
+/**
+ * Extract structured expense data from an uploaded receipt.
+ *
+ * Takes the in-memory upload buffer directly — there is no disk to read from on
+ * Vercel, and the bytes are already in hand at upload time, so the blob is never
+ * re-fetched.
+ *
+ * @param {Buffer} buffer       raw file bytes (multer memoryStorage)
+ * @param {string} originalName original filename, used only to pick the media type
+ */
+async function parseReceiptBuffer(buffer, originalName = '', expenseType = 'general', customSchema = null, aiHints = null) {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw new Error('No file data to extract from');
+  }
   const client = getClient();
   const today = new Date().toISOString().split('T')[0];
-  const ext = path.extname(filePath).toLowerCase();
-  const fileData = fs.readFileSync(filePath).toString('base64');
+  const ext = path.extname(originalName || '').toLowerCase();
+  const fileData = buffer.toString('base64');
 
   let prompt;
   if (customSchema) prompt = buildCustomPrompt(today, customSchema, aiHints);
@@ -331,4 +349,4 @@ async function parseReceiptFile(filePath, originalName = '', expenseType = 'gene
   return parsed;
 }
 
-module.exports = { parseReceiptFile };
+module.exports = { parseReceiptBuffer };
