@@ -1,6 +1,6 @@
 const express = require('express');
 const ExcelJS = require('exceljs');
-const db = require('../db/database');
+const { query } = require('../db');
 const { addMoney } = require('../utils/money');
 const { requireAuth, requireMinRole } = require('../middleware/auth');
 
@@ -8,7 +8,7 @@ const router = express.Router();
 router.use(requireAuth);
 router.use(requireMinRole('finance'));
 
-// ── Palette (Agthia sage-green brand) ───────────────────────────────────────────
+// ── Palette (Agthia sage-green brand) ─────────────────────────────────────────
 const C = {
   ink:      'FF0F172A', // slate-900 — title bar
   brand:    'FF62833A', // brand-600 — column headers
@@ -55,28 +55,33 @@ router.get('/', async (req, res) => {
     const now = new Date();
     const thisYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    // ── period clause builder (parameterised) ───────────────────────────────────
-    const periodClause = (col = 'date') => {
-      let c = ''; const params = [];
-      if (type === 'this_month') { c = ` AND strftime('%Y-%m', ${col}) = ?`; params.push(thisYM); }
-      else if (type === 'custom') {
-        if (from) { c += ` AND ${col} >= ?`; params.push(from); }
-        if (to)   { c += ` AND ${col} <= ?`; params.push(to); }
+    const orgId = req.user.org_id;
+
+    // ── WHERE builder (fully parameterised; org_id is always $1) ───────────────
+    // `date` is TEXT 'YYYY-MM-DD', so strftime('%Y-%m', date) → substr(date,1,7).
+    const buildWhere = (col = 'date') => {
+      const where = ['org_id = $1'];
+      const params = [orgId];
+      const bind = (v) => { params.push(v); return `$${params.length}`; };
+      if (type === 'this_month') {
+        where.push(`substr(${col},1,7) = ${bind(thisYM)}`);
+      } else if (type === 'custom') {
+        if (from) where.push(`${col} >= ${bind(from)}`);
+        if (to)   where.push(`${col} <= ${bind(to)}`);
       }
-      return { c, params };
+      return { sql: where.join(' AND '), params };
     };
 
-    const orgId = req.user.org_id;
-    const exp = periodClause();
-    const records = db.prepare(`SELECT * FROM expenses WHERE org_id=${orgId}${exp.c} ORDER BY date ASC`).all(...exp.params).map(r => ({
+    const exp = buildWhere();
+    const records = (await query(`SELECT * FROM expenses WHERE ${exp.sql} ORDER BY date ASC`, exp.params)).map(r => ({
       ...r,
       line_items:        JSON.parse(r.line_items        || '[]'),
       container_numbers: JSON.parse(r.container_numbers || '[]'),
       bl_numbers:        JSON.parse(r.bl_numbers        || '[]'),
     }));
 
-    const sav = periodClause();
-    const savingsRecords = db.prepare(`SELECT * FROM clearance_savings WHERE org_id=${orgId}${sav.c} ORDER BY date ASC`).all(...sav.params);
+    const sav = buildWhere();
+    const savingsRecords = await query(`SELECT * FROM clearance_savings WHERE ${sav.sql} ORDER BY date ASC`, sav.params);
 
     const wb = new ExcelJS.Workbook();
     wb.creator = 'Agthia Petty Cash';
@@ -184,14 +189,21 @@ router.get('/', async (req, res) => {
       r++;
     };
 
-    const catData = db.prepare(`SELECT category as name, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total FROM expenses WHERE org_id=${orgId}${exp.c} GROUP BY category ORDER BY total DESC`).all(...exp.params);
+    const breakdownBy = (col) => query(
+      `SELECT ${col} AS name, COUNT(*)::int AS cnt, SUM(COALESCE(amount_aed,amount)) AS total
+       FROM expenses WHERE ${exp.sql}
+       GROUP BY ${col} ORDER BY total DESC`,
+      exp.params
+    );
+
+    const [catData, typeDataRaw, buData] = await Promise.all([
+      breakdownBy('category'),
+      breakdownBy('expense_type'),
+      breakdownBy('business_unit'),
+    ]);
+
     breakdownTable('  SPEND BY CATEGORY', catData);
-
-    const typeData = db.prepare(`SELECT expense_type as name, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total FROM expenses WHERE org_id=${orgId}${exp.c} GROUP BY expense_type ORDER BY total DESC`).all(...exp.params)
-      .map(x => ({ ...x, name: typeLabel(x.name) }));
-    breakdownTable('  SPEND BY TYPE', typeData);
-
-    const buData = db.prepare(`SELECT business_unit as name, COUNT(*) as cnt, SUM(COALESCE(amount_aed,amount)) as total FROM expenses WHERE org_id=${orgId}${exp.c} GROUP BY business_unit ORDER BY total DESC`).all(...exp.params);
+    breakdownTable('  SPEND BY TYPE', typeDataRaw.map(x => ({ ...x, name: typeLabel(x.name) })));
     breakdownTable('  SPEND BY BUSINESS UNIT', buData);
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -423,7 +435,7 @@ router.get('/', async (req, res) => {
       });
     }
 
-    // ─── Send ───────────────────────────────────────────────────────────────────
+    // ─── Send ──────────────────────────────────────────────────────────────────────
     const safeName = dateRange.replace(/[^a-zA-Z0-9\-]/g, '_');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="AgthiaPettyCash_${safeName}.xlsx"`);
