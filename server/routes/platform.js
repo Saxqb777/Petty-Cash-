@@ -1,5 +1,6 @@
 const express = require('express');
 const { sql, one, withTransaction, toId } = require('../db');
+const { dropReceipts } = require('../utils/blob');
 const { requireSuperadmin } = require('../middleware/auth');
 
 const router = express.Router();
@@ -94,6 +95,13 @@ router.delete('/orgs/:id', async (req, res) => {
     const org = await one('SELECT * FROM organizations WHERE id = $1', [id]);
     if (!org) return res.status(404).json({ error: 'Org not found' });
 
+    // Collect the receipts BEFORE the rows go, since afterwards there is no
+    // record of what this tenant ever uploaded. Wiping an org otherwise leaves
+    // every one of its receipts readable at its public Blob URL indefinitely.
+    const receipts = await sql`
+      SELECT image_path FROM expenses
+      WHERE org_id = ${id} AND image_path IS NOT NULL`;
+
     // The FKs are ON DELETE CASCADE, but the deletes stay explicit and ordered
     // so the intent is readable and the operation is one atomic transaction.
     await withTransaction(async (tx) => {
@@ -105,7 +113,11 @@ router.delete('/orgs/:id', async (req, res) => {
       await tx.query('DELETE FROM organizations    WHERE id     = $1', [id]);
     });
 
-    res.json({ success: true, name: org.name });
+    // Only once the transaction has committed. Deleting the files first would
+    // destroy the receipts even if the wipe then rolled back.
+    const { deleted } = await dropReceipts(receipts.map((r) => r.image_path));
+
+    res.json({ success: true, name: org.name, receiptsDeleted: deleted });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

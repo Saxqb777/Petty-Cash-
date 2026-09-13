@@ -1,6 +1,7 @@
 const express = require('express');
 const { sql, query, one, withTransaction, toId } = require('../db');
 const { convertToAed, addMoney } = require('../utils/money');
+const { dropReceipts } = require('../utils/blob');
 const { requireAuth, requireMinRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -366,10 +367,16 @@ router.delete('/:id', requireMinRole('finance'), async (req, res) => {
     if (!id) return res.status(404).json({ error: 'Record not found' });
 
     const deleted = await query(
-      'DELETE FROM expenses WHERE id = $1 AND org_id = $2 RETURNING id',
+      'DELETE FROM expenses WHERE id = $1 AND org_id = $2 RETURNING id, image_path',
       [id, req.user.org_id]
     );
     if (deleted.length === 0) return res.status(404).json({ error: 'Record not found' });
+
+    // The row is gone; drop the receipt too, or it stays readable at its public
+    // Blob URL forever. Best effort, and deliberately after the response is
+    // decided, so a storage hiccup cannot fail a delete that already succeeded.
+    await dropReceipts(deleted[0].image_path);
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
