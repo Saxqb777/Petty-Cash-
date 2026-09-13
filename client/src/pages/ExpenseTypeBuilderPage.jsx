@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Plus, Trash2, GripVertical, Settings2, Lock, ChevronDown,
+  Plus, Trash2, Lock, ChevronDown, ChevronUp,
   Fuel, Ship, LayoutGrid, Receipt, Briefcase, Car, Plane,
   Coffee, Package, Zap, Home, ShoppingBag, Truck, FileSpreadsheet,
   Save, X, Edit2, Archive
@@ -59,6 +59,23 @@ const newField = () => ({
 
 const slugify = (name) =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+/* Readable form label. `.label` stays reserved for micro-labels. */
+function L({ children, htmlFor }) {
+  return <label htmlFor={htmlFor} className="block text-sm font-bold text-ink-700 mb-1.5">{children}</label>;
+}
+
+function Section({ title, note, children }) {
+  return (
+    <section className="border-t-2 border-ink-900 pt-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+        <h2 className="text-lg w-wide text-ink-900">{title}</h2>
+        {note && <p className="text-sm text-ink-500">{note}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function ExpenseTypeBuilderPage() {
   const { showToast } = useToast();
@@ -184,159 +201,170 @@ export default function ExpenseTypeBuilderPage() {
   if (editing !== null) {
     const SelectedIcon = ICON_MAP[form.icon] || Receipt;
     return (
-      <div className="p-6 max-w-2xl mx-auto">
+      <div className="p-4 sm:p-6 max-w-2xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => setEditing(null)} className="w-8 h-8 rounded-lg hover:bg-paper-200 flex items-center justify-center text-ink-500">
-            <X className="w-4 h-4" />
+          <button
+            onClick={() => setEditing(null)}
+            aria-label="Close editor"
+            className="w-9 h-9 border-2 border-ink-900 bg-white flex items-center justify-center text-ink-900 hover:bg-paper-100 transition-colors duration-[120ms] flex-shrink-0"
+          >
+            <X className="w-4 h-4" strokeWidth={2.5} />
           </button>
-          <h1 className="text-xl font-bold text-ink-900">
-            {editing === 'new' ? 'Create Custom Expense Type' : 'Edit Expense Type'}
+          <h1 className="text-2xl w-wider text-ink-900">
+            {editing === 'new' ? 'New expense type' : 'Edit expense type'}
           </h1>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-7">
           {/* Basic info */}
-          <div className="card p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-ink-700">Basic Information</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="label">Type Name</label>
-                <input className="input" value={form.name} onChange={e => handleNameChange(e.target.value)} placeholder="e.g. Hotel Accommodation" />
+          <Section title="Basics">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <L htmlFor="t-name">Type name</L>
+                <input id="t-name" className="input" value={form.name} onChange={e => handleNameChange(e.target.value)} placeholder="e.g. Hotel Accommodation" />
               </div>
               <div>
-                <label className="label">Slug (unique ID)</label>
-                <input className="input font-mono" value={form.slug}
+                <L htmlFor="t-slug">Slug</L>
+                <input id="t-slug" className="input font-mono" value={form.slug}
                   onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '') }))}
                   placeholder="hotel-accommodation" disabled={slugLocked} />
-                {slugLocked && <p className="text-xs text-ink-400 mt-1">Slug cannot be changed after creation</p>}
+                <p className="text-sm text-ink-500 mt-1.5">
+                  {slugLocked ? 'Fixed once the type exists' : 'Unique id, generated from the name'}
+                </p>
               </div>
               <div>
-                <label className="label">Description</label>
-                <input className="input" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                <L htmlFor="t-desc">Description</L>
+                <input id="t-desc" className="input" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                   placeholder="Short description for users" />
               </div>
             </div>
-          </div>
+          </Section>
 
           {/* Icon + Color */}
-          <div className="card p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-ink-700">Icon & Color</h2>
-            <div className="flex items-center gap-4 mb-2">
-              <div className="w-14 h-14 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: form.color + '1a' }}>
-                <SelectedIcon className="w-7 h-7" style={{ color: form.color }} />
+          <Section title="Mark">
+            <div className="flex items-center gap-4 mb-5">
+              <div className="w-14 h-14 border-2 border-ink-900 bg-white flex items-center justify-center flex-shrink-0">
+                <SelectedIcon className="w-7 h-7" strokeWidth={2} style={{ color: form.color }} />
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-ink-700 mb-1">Preview</p>
-                <p className="text-xs text-ink-400">{form.name || 'Type name'}</p>
+              <div className="min-w-0">
+                <p className="label mb-1">Preview</p>
+                <p className="text-sm font-bold text-ink-900 truncate">{form.name || 'Type name'}</p>
               </div>
             </div>
-            <div>
-              <p className="text-xs font-medium text-ink-500 mb-2">Icon</p>
-              <div className="flex flex-wrap gap-2">
-                {ICON_OPTIONS.map(({ key, Icon }) => (
+
+            <p className="label">Icon</p>
+            <div className="flex flex-wrap gap-2 mb-5">
+              {ICON_OPTIONS.map(({ key, Icon, label }) => {
+                const on = form.icon === key;
+                return (
                   <button key={key} onClick={() => setForm(f => ({ ...f, icon: key }))}
-                    className={`w-9 h-9 rounded-lg flex items-center justify-center transition-all ${form.icon === key ? 'ring-2 ring-offset-1' : 'border border-paper-400 hover:border-paper-500'}`}
-                    style={form.icon === key ? { ringColor: form.color, backgroundColor: form.color + '1a' } : {}}>
-                    <Icon className="w-4 h-4" style={form.icon === key ? { color: form.color } : { color: '#6b7280' }} />
+                    aria-label={label} aria-pressed={on} title={label}
+                    className={`w-10 h-10 flex items-center justify-center transition-colors duration-[120ms] ${
+                      on ? 'border-2 border-ink-900 bg-paper-200' : 'border border-paper-400 bg-white hover:border-ink-900'
+                    }`}>
+                    <Icon className="w-4 h-4" strokeWidth={2} style={{ color: on ? form.color : '#57575F' }} />
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-            <div>
-              <p className="text-xs font-medium text-ink-500 mb-2">Color</p>
-              <div className="flex gap-2 flex-wrap">
-                {COLOR_OPTIONS.map(c => (
-                  <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))}
-                    className={`w-7 h-7 rounded-full transition-transform ${form.color === c ? 'scale-125 ring-2 ring-offset-1 ring-gray-400' : 'hover:scale-110'}`}
-                    style={{ backgroundColor: c }} />
-                ))}
-              </div>
+
+            <p className="label">Colour</p>
+            <div className="flex gap-2 flex-wrap">
+              {COLOR_OPTIONS.map(c => (
+                <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))}
+                  aria-label={`Colour ${c}`} aria-pressed={form.color === c} title={c}
+                  className={`w-9 h-9 transition-colors duration-[120ms] ${form.color === c ? 'border-2 border-ink-900' : 'border border-paper-400'}`}
+                  style={{ backgroundColor: c }} />
+              ))}
             </div>
-          </div>
+          </Section>
 
           {/* AI Hints */}
-          <div className="card p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-ink-700">AI Extraction Hints</h2>
-            <p className="text-xs text-ink-500">Tell the AI what kind of document this is so it extracts the right fields.</p>
-            <textarea className="input resize-none" rows={3} value={form.ai_hints}
+          <Section title="Extraction hints" note="Optional">
+            <p className="text-sm text-ink-500 mb-3">Tell the AI what kind of document this is so it extracts the right fields.</p>
+            <textarea className="textarea resize-none" rows={3} value={form.ai_hints}
+              aria-label="AI extraction hints"
               onChange={e => setForm(f => ({ ...f, ai_hints: e.target.value }))}
-              placeholder="e.g. Hotel invoice or booking confirmation. Look for check-in/check-out dates, room type, and number of nights." />
-          </div>
+              placeholder="e.g. Hotel invoice or booking confirmation. Look for check-in and check-out dates, room type, and number of nights." />
+          </Section>
 
           {/* Fields */}
-          <div className="card p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-ink-700">Form Fields</h2>
-              <p className="text-xs text-ink-400">Standard fields (vendor, amount, date) are always included</p>
-            </div>
-
-            <div className="space-y-3">
+          <Section title="Form fields" note="Vendor, amount and date are always included">
+            <div className="border-t border-paper-300">
               {form.fields.map((field, idx) => (
-                <div key={field.key} className="border border-paper-400 rounded-lg p-3 space-y-3 bg-paper-100">
-                  <div className="flex items-start gap-2">
-                    <div className="flex flex-col gap-1 pt-1 flex-shrink-0">
-                      <button onClick={() => moveField(idx, -1)} className="text-ink-300 hover:text-ink-500 disabled:opacity-20" disabled={idx === 0}>
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                <div key={field.key} className="border-b border-paper-300 py-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex flex-col items-center gap-1 pt-1 flex-shrink-0">
+                      <span className="font-mono text-xs text-ink-400">{String(idx + 1).padStart(2, '0')}</span>
+                      <button onClick={() => moveField(idx, -1)} aria-label="Move field up"
+                        className="text-ink-500 hover:text-ink-900 disabled:opacity-25 transition-colors duration-[120ms]" disabled={idx === 0}>
+                        <ChevronUp className="w-4 h-4" strokeWidth={2.5} />
                       </button>
-                      <button onClick={() => moveField(idx, 1)} className="text-ink-300 hover:text-ink-500 disabled:opacity-20" disabled={idx === form.fields.length - 1}>
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      <button onClick={() => moveField(idx, 1)} aria-label="Move field down"
+                        className="text-ink-500 hover:text-ink-900 disabled:opacity-25 transition-colors duration-[120ms]" disabled={idx === form.fields.length - 1}>
+                        <ChevronDown className="w-4 h-4" strokeWidth={2.5} />
                       </button>
                     </div>
-                    <div className="flex-1 grid grid-cols-2 gap-2">
+
+                    <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[11px] font-medium text-ink-500 block mb-1">Field Label</label>
-                        <input className="input text-sm py-1.5" value={field.label}
+                        <L>Field label</L>
+                        <input className="input" value={field.label}
                           onChange={e => updateField(idx, { label: e.target.value })} placeholder="e.g. Project Code" />
                       </div>
                       <div>
-                        <label className="text-[11px] font-medium text-ink-500 block mb-1">Field Type</label>
+                        <L>Field type</L>
                         <div className="relative">
-                          <select className="input appearance-none pr-8 text-sm py-1.5 cursor-pointer"
+                          <select className="select"
+                            aria-label="Field type"
                             value={field.type} onChange={e => updateField(idx, { type: e.target.value, options: [] })}>
                             {FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                           </select>
-                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-400 pointer-events-none" />
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500 pointer-events-none" strokeWidth={2} />
                         </div>
                       </div>
                       <div>
-                        <label className="text-[11px] font-medium text-ink-500 block mb-1">Placeholder (optional)</label>
-                        <input className="input text-sm py-1.5" value={field.placeholder}
-                          onChange={e => updateField(idx, { placeholder: e.target.value })} placeholder="Hint text..." />
+                        <L>Placeholder</L>
+                        <input className="input" value={field.placeholder}
+                          onChange={e => updateField(idx, { placeholder: e.target.value })} placeholder="Hint text" />
                       </div>
-                      <div className="flex items-end pb-1">
+                      <div className="flex items-end pb-2.5">
                         <label className="flex items-center gap-2 cursor-pointer select-none">
                           <input type="checkbox" checked={field.required}
                             onChange={e => updateField(idx, { required: e.target.checked })}
-                            className="w-3.5 h-3.5 rounded accent-brand-600" />
-                          <span className="text-sm text-ink-600">Required</span>
+                            className="w-4 h-4 accent-blue-600" />
+                          <span className="text-sm text-ink-700 font-bold">Required</span>
                         </label>
                       </div>
                     </div>
-                    <button onClick={() => removeField(idx)} className="text-ink-200 hover:text-red-400 flex-shrink-0 mt-1">
-                      <Trash2 className="w-4 h-4" />
+
+                    <button onClick={() => removeField(idx)} aria-label="Remove field" title="Remove field"
+                      className="w-9 h-9 border-2 border-paper-400 text-ink-500 flex items-center justify-center hover:border-flare-700 hover:text-flare-700 transition-colors duration-[120ms] flex-shrink-0 mt-6">
+                      <Trash2 className="w-4 h-4" strokeWidth={2} />
                     </button>
                   </div>
 
                   {field.type === 'select' && (
-                    <div className="ml-5">
-                      <p className="text-[11px] font-medium text-ink-500 mb-1">Dropdown Options</p>
-                      <div className="flex flex-wrap gap-1 mb-2">
+                    <div className="mt-3 ml-0 sm:ml-9 border-l-2 border-paper-300 pl-3">
+                      <p className="label">Dropdown options</p>
+                      <div className="flex flex-wrap gap-2 mb-2">
                         {field.options.map(opt => (
-                          <span key={opt} className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-paper-400 rounded text-xs text-ink-700">
+                          <span key={opt} className="inline-flex items-center gap-2 pl-2.5 pr-1.5 py-0.5 bg-white border-2 border-ink-900 text-sm text-ink-900">
                             {opt}
                             <button onClick={() => updateField(idx, { options: field.options.filter(o => o !== opt) })}
-                              className="text-ink-300 hover:text-red-400"><X className="w-2.5 h-2.5" /></button>
+                              aria-label={`Remove option ${opt}`}
+                              className="text-ink-500 hover:text-flare-700 transition-colors duration-[120ms]"><X className="w-3 h-3" strokeWidth={2.5} /></button>
                           </span>
                         ))}
                       </div>
                       <div className="flex gap-2">
-                        <input className="input text-sm py-1 flex-1" value={field._optionInput}
+                        <input className="input flex-1" value={field._optionInput}
+                          aria-label="New dropdown option"
                           onChange={e => updateField(idx, { _optionInput: e.target.value })}
                           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addOption(idx); }}}
-                          placeholder="Add option..." />
-                        <button onClick={() => addOption(idx)} className="btn-secondary text-xs px-2.5 py-1 flex-shrink-0">
-                          <Plus className="w-3 h-3" />
+                          placeholder="Add option" />
+                        <button onClick={() => addOption(idx)} className="btn-ghost btn-sm flex-shrink-0" aria-label="Add option">
+                          <Plus className="w-3.5 h-3.5" strokeWidth={2.5} /> Add
                         </button>
                       </div>
                     </div>
@@ -345,17 +373,17 @@ export default function ExpenseTypeBuilderPage() {
               ))}
             </div>
 
-            <button onClick={addField} className="flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 font-medium">
-              <Plus className="w-4 h-4" /> Add field
+            <button onClick={addField} className="btn-quiet btn-sm mt-4">
+              <Plus className="w-3.5 h-3.5" strokeWidth={2.5} /> Add field
             </button>
-          </div>
+          </Section>
 
-          <div className="flex gap-3">
-            <button onClick={() => setEditing(null)} className="btn-secondary">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2">
+          <div className="flex flex-wrap gap-3 border-t-2 border-ink-900 pt-5">
+            <button onClick={() => setEditing(null)} className="btn-ghost">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
               {saving
-                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</>
-                : <><Save className="w-4 h-4" /> {editing === 'new' ? 'Create Type' : 'Save Changes'}</>
+                ? <><span className="w-2.5 h-2.5 bg-current animate-pulse" /> Saving</>
+                : <><Save className="w-4 h-4" strokeWidth={2.5} /> {editing === 'new' ? 'Create type' : 'Save changes'}</>
               }
             </button>
           </div>
@@ -364,72 +392,78 @@ export default function ExpenseTypeBuilderPage() {
     );
   }
 
-  // ── Type List ─────────────────────────────────────────────────────────────────
+  // ── Type List ──────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-ink-900 tracking-tight">Expense Types</h1>
-          <p className="text-sm text-ink-400 mt-0.5 font-medium">Manage the types of expenses your team can submit</p>
+          <h1 className="text-3xl w-wider text-ink-900">Expense types</h1>
+          <p className="text-sm text-ink-500 mt-1">Manage the types of expenses your team can submit</p>
         </div>
-        <button onClick={startCreate} className="btn-primary flex items-center gap-2 text-sm">
-          <Plus className="w-4 h-4" /> New Type
+        <button onClick={startCreate} className="btn-primary">
+          <Plus className="w-4 h-4" strokeWidth={2.5} /> New type
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-ink-400 text-sm">
-          <div className="w-4 h-4 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
-          Loading…
+        <div className="space-y-2">
+          <div className="skeleton h-16 w-full" />
+          <div className="skeleton h-16 w-full" />
+          <div className="skeleton h-16 w-full" />
         </div>
       ) : (
-        <div className="card overflow-hidden divide-y divide-paper-300">
+        <div className="plate">
           {types.map(type => {
             const IconComp = ICON_MAP[type.icon] || Receipt;
+            const builtin = !!type.is_builtin;
             return (
-              <div key={type.id} className="px-4 py-3 flex items-center gap-3 hover:bg-paper-100 transition-colors">
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: type.color + '18' }}>
-                  <IconComp className="w-[18px] h-[18px]" style={{ color: type.color }} />
+              <div key={type.id} className="px-3 py-3 flex flex-wrap items-center gap-3 border-b border-paper-300 last:border-b-0 hover:bg-blue-50 transition-colors duration-[120ms]">
+                <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${builtin ? 'bg-ink-900' : 'border-2 border-ink-900 bg-white'}`}>
+                  <IconComp
+                    className="w-[18px] h-[18px]"
+                    strokeWidth={2}
+                    style={{ color: builtin ? '#EDECE8' : type.color }}
+                  />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-ink-800 text-sm font-semibold">{type.name}</p>
-                    {type.is_builtin ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-paper-300 border border-paper-400 rounded text-ink-400 text-[10px]">
-                        <Lock className="w-2.5 h-2.5" /> Built-in
-                      </span>
+                <div className="flex-1 min-w-[10rem]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-ink-900 text-sm font-bold">{type.name}</p>
+                    {builtin ? (
+                      <span className="tag-muted"><Lock className="w-2.5 h-2.5" strokeWidth={2.5} /> Built in</span>
                     ) : (
-                      <span className="px-1.5 py-0.5 bg-brand-100 border border-brand-200 rounded text-brand-700 text-[10px]">Custom</span>
+                      <span className="tag-blue">Custom</span>
                     )}
                   </div>
-                  <p className="text-ink-400 text-xs truncate">{type.description || `${type.fields_schema?.length || 0} fields`}</p>
+                  <p className="text-sm text-ink-500 truncate">
+                    {type.description || `${type.fields_schema?.length || 0} fields`}
+                  </p>
                 </div>
-                {!type.is_builtin && (
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => startEdit(type)} className="p-1.5 text-ink-300 hover:text-ink-700 transition-colors rounded" title="Edit">
-                      <Edit2 className="w-3.5 h-3.5" />
+                {!builtin && (
+                  <div className="flex items-center gap-2 ml-auto">
+                    <button onClick={() => startEdit(type)} title="Edit" aria-label={`Edit ${type.name}`}
+                      className="w-9 h-9 border-2 border-paper-400 text-ink-500 flex items-center justify-center hover:border-ink-900 hover:text-ink-900 transition-colors duration-[120ms]">
+                      <Edit2 className="w-3.5 h-3.5" strokeWidth={2} />
                     </button>
-                    <button onClick={() => setConfirm({ id: type.id, name: type.name })}
-                      className="p-1.5 text-ink-300 hover:text-amber-500 transition-colors rounded" title="Archive">
-                      <Archive className="w-3.5 h-3.5" />
+                    <button onClick={() => setConfirm({ id: type.id, name: type.name })} title="Archive" aria-label={`Archive ${type.name}`}
+                      className="w-9 h-9 border-2 border-paper-400 text-ink-500 flex items-center justify-center hover:border-flare-700 hover:text-flare-700 transition-colors duration-[120ms]">
+                      <Archive className="w-3.5 h-3.5" strokeWidth={2} />
                     </button>
                   </div>
-                )}
-                {type.is_builtin && (
-                  <Settings2 className="w-3.5 h-3.5 text-ink-300" />
                 )}
               </div>
             );
           })}
+          {types.length === 0 && (
+            <p className="px-3 py-6 text-sm text-ink-500">No expense types yet.</p>
+          )}
         </div>
       )}
 
-      <div className="card p-4 text-xs text-ink-500 space-y-1.5">
-        <p className="text-ink-700 font-semibold mb-2">About custom types</p>
-        <p>Built-in types (Petrol, Shipping, General) have specialized forms and cannot be removed.</p>
-        <p>Custom types use a dynamic form built from your field definitions, with AI extraction powered by your hints.</p>
-      </div>
+      <section>
+        <p className="label border-b-2 border-ink-900 pb-2 mb-3">About custom types</p>
+        <p className="text-sm text-ink-500 mb-1.5">Built-in types (Petrol, Shipping, General) have specialised forms and cannot be removed.</p>
+        <p className="text-sm text-ink-500">Custom types use a dynamic form built from your field definitions, with AI extraction powered by your hints.</p>
+      </section>
 
       <ConfirmDialog
         open={!!confirm}
