@@ -51,7 +51,7 @@ const fileHref = (p) => {
 };
 const isPdf = (p) => /\.pdf(\?|#|$)/i.test(p || '');
 
-// ─── Modal shell — flat scrim, white plate, 2px ink rule ──────────────────────────
+// ─── Modal shell — flat scrim, white plate, 2px ink rule ──────────────────────
 function Modal({ title, onClose, children, footer, size = 'max-w-md' }) {
   useEffect(() => {
     const handle = (e) => { if (e.key === 'Escape') onClose(); };
@@ -144,7 +144,7 @@ function ExportModal({ onClose }) {
   );
 }
 
-// ─── Edit Modal ───────────────────────────────────────────────────────────────
+// ─── Edit Modal ────────────────────────────────────────────────────────────────
 function EditModal({ record, onClose, onSave }) {
   const toast = useToast();
   const [form, setForm] = useState({ ...record, line_items: undefined });
