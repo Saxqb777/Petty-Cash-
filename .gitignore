@@ -5,3 +5,6 @@ node_modules/
 dist/
 .vercel
 .DS_Store
+
+# Generated document. Rebuild with: python3 docs/build_sop.py
+docs/*.pdf
