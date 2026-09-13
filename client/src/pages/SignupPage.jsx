@@ -58,30 +58,60 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-paper-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        {/* Brand */}
-        <div className="flex items-center gap-3 justify-center mb-8">
-          <div className="w-10 h-10 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-base font-bold font-heading tracking-tight">DL</span>
+    <div className="min-h-screen bg-paper-100 lg:grid lg:grid-cols-2">
+      {/* ── The blue plate ─────────────────────────────────────────────── */}
+      <section className="relative bg-blue-600 border-b-2 border-ink-900 lg:border-b-0 lg:border-r-2 px-5 py-6 sm:px-8 lg:px-12 lg:py-12 flex flex-col justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-flare-500 flex items-center justify-center flex-shrink-0">
+            <span className="text-ink-900 text-base font-extrabold w-wide">DL</span>
           </div>
           <div>
-            <p className="text-ink-900 font-heading font-bold text-xl leading-tight tracking-tight">Doc Ledger</p>
-            <p className="text-ink-400 text-[10px] font-medium tracking-widest uppercase">Expense Management</p>
+            <p className="text-white font-extrabold text-xl w-wide leading-none">Doc Ledger</p>
+            <p className="font-mono text-2xs uppercase text-blue-200 mt-1">Expense Management</p>
           </div>
         </div>
 
-        <div className="bg-white border border-paper-400 rounded-lg shadow-card p-6">
-          {/* Step bar */}
-          <div className="flex gap-1.5 mb-5">
+        {/* Two plates, one overprint. */}
+        <div className="hidden lg:block relative h-60 w-full max-w-xs my-10" aria-hidden="true">
+          <div className="absolute left-0 top-0 w-44 h-40 bg-white border-2 border-ink-900 p-3">
+            <p className="font-mono text-2xs uppercase text-ink-500">Org 001</p>
+            <div className="mt-3 space-y-2">
+              <div className="h-1.5 w-full bg-paper-300" />
+              <div className="h-1.5 w-3/4 bg-paper-300" />
+              <div className="h-1.5 w-2/3 bg-paper-300" />
+            </div>
+            <p className="mt-4 font-mono text-sm text-ink-900">4 members</p>
+          </div>
+          <div className="overprint absolute left-24 top-16 w-44 h-40 bg-flare-500 border-2 border-ink-900 p-3">
+            <p className="font-mono text-2xs uppercase text-ink-900">You</p>
+          </div>
+          <div className="overprint absolute left-6 top-52 w-32 h-2 bg-green-500" />
+        </div>
+
+        <div>
+          <p className="text-white text-lg leading-snug max-w-sm">
+            One ledger for the whole team. Start an organization, or ask to join the one you belong to.
+          </p>
+          <p className="font-mono text-2xs uppercase text-blue-200 mt-4">
+            Capture / Extract / Reconcile / Export
+          </p>
+        </div>
+      </section>
+
+      {/* ── The form on paper ──────────────────────────────────────────── */}
+      <section className="flex items-center justify-center px-4 py-10 sm:px-8">
+        <div className="w-full max-w-sm">
+          {/* Step bar: two rectangles, no pill */}
+          <div className="flex gap-1.5 mb-6">
             {[1, 2].map(s => (
-              <div key={s} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${step >= s ? 'bg-brand-500' : 'bg-paper-400'}`} />
+              <div key={s} className={`h-1.5 flex-1 transition-colors duration-[120ms] ${step >= s ? 'bg-blue-600' : 'bg-paper-400'}`} />
             ))}
           </div>
 
           {step === 1 ? (
             <>
-              <h1 className="text-ink-900 text-lg font-semibold mb-5">Create account</h1>
+              <p className="label">Step 01 of 02</p>
+              <h1 className="display w-wider text-3xl text-ink-900 mb-6">Create account</h1>
               <form onSubmit={nextStep} className="space-y-4">
                 <div>
                   <label className="label">Full name</label>
@@ -102,23 +132,25 @@ export default function SignupPage() {
                     className="input" placeholder="8+ characters" />
                 </div>
                 <button type="submit" className="btn-primary w-full mt-1">
-                  Continue →
+                  Continue
                 </button>
               </form>
             </>
           ) : (
             <>
-              <h1 className="text-ink-900 text-lg font-semibold mb-1">Your organization</h1>
-              <p className="text-ink-400 text-xs mb-5">Create a new one or join an existing organization</p>
+              <p className="label">Step 02 of 02</p>
+              <h1 className="display w-wider text-3xl text-ink-900 mb-2">Your organization</h1>
+              <p className="text-sm text-ink-500 mb-6">Create a new one or join an existing organization.</p>
               <form onSubmit={submit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-2">
                   {[['create', 'Create new'], ['join', 'Join existing']].map(([val, label]) => (
                     <button key={val} type="button"
                       onClick={() => setForm(f => ({ ...f, action: val }))}
-                      className={`py-2.5 rounded-lg text-[13px] font-medium border transition-all ${
+                      aria-pressed={form.action === val}
+                      className={`py-2.5 text-sm font-bold border-2 transition-colors duration-[120ms] ${
                         form.action === val
-                          ? 'bg-brand-50 border-brand-300 text-brand-700'
-                          : 'bg-white border-paper-400 text-ink-500 hover:text-ink-800 hover:bg-paper-100'
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-white border-paper-400 text-ink-600 hover:border-ink-900 hover:text-ink-900'
                       }`}
                     >
                       {label}
@@ -138,34 +170,38 @@ export default function SignupPage() {
                     <label className="label">Select organization</label>
                     <select value={form.org_id}
                       onChange={e => setForm(f => ({ ...f, org_id: e.target.value }))}
-                      className="input">
+                      className="select">
                       <option value="">Choose…</option>
                       {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </select>
-                    <p className="text-ink-400 text-xs mt-1.5">Your request will need admin approval before you can access the app.</p>
+                    <p className="text-sm text-ink-500 mt-2">
+                      Your request needs admin approval before you can access the app.
+                    </p>
                   </div>
                 )}
 
                 <div className="flex gap-2 pt-1">
-                  <button type="button" onClick={() => setStep(1)}
-                    className="btn-secondary flex-1">
-                    ← Back
+                  <button type="button" onClick={() => setStep(1)} className="btn-ghost flex-1">
+                    Back
                   </button>
-                  <button type="submit" disabled={loading}
-                    className="btn-primary flex-1 disabled:opacity-50">
+                  <button type="submit" disabled={loading} className="btn-primary flex-1">
                     {loading ? 'Creating…' : form.action === 'create' ? 'Create' : 'Send request'}
                   </button>
                 </div>
               </form>
             </>
           )}
-        </div>
 
-        <p className="text-ink-400 text-xs text-center mt-4">
-          Already have an account?{' '}
-          <Link to="/login" className="text-brand-600 hover:text-brand-700 font-medium">Sign in</Link>
-        </p>
-      </div>
+          <div className="border-t border-paper-400 mt-8 pt-4">
+            <p className="text-sm text-ink-500">
+              Already have an account?{' '}
+              <Link to="/login" className="text-blue-600 font-bold underline underline-offset-2 hover:text-blue-700">
+                Sign in
+              </Link>
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
