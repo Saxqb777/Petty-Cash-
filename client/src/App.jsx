@@ -16,10 +16,11 @@ import MembersPage from './pages/MembersPage';
 import ExpenseTypeBuilderPage from './pages/ExpenseTypeBuilderPage';
 import PlatformPage from './pages/PlatformPage';
 
+// 120ms ease-out, opacity and a 4px translate. No spring, no scale.
 const pageVariants = {
-  initial: { opacity: 0, y: 10 },
-  enter:   { opacity: 1, y: 0,  transition: { duration: 0.28, ease: [0.25, 0.46, 0.45, 0.94] } },
-  exit:    { opacity: 0, y: -6, transition: { duration: 0.18, ease: 'easeIn' } }
+  initial: { opacity: 0, y: 4 },
+  enter:   { opacity: 1, y: 0, transition: { duration: 0.14, ease: 'easeOut' } },
+  exit:    { opacity: 0, y: -4, transition: { duration: 0.12, ease: 'easeOut' } }
 };
 
 function PageWrapper({ children }) {
@@ -56,7 +57,10 @@ function AppShell() {
   if (user === undefined) {
     return (
       <div className="min-h-screen bg-paper-100 flex items-center justify-center">
-        <div className="w-5 h-5 border-2 border-brand-200 border-t-brand-600 rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-4 h-4 bg-blue-600 animate-pulse" />
+          <span className="font-mono text-2xs uppercase text-ink-400">Loading</span>
+        </div>
       </div>
     );
   }
@@ -88,7 +92,7 @@ function AppShell() {
   return (
     <div className="flex min-h-screen bg-paper-100">
       <Sidebar />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 min-w-0 overflow-auto pt-14 lg:pt-0">
         <AnimatedRoutes />
       </main>
     </div>
