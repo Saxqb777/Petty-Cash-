@@ -8,7 +8,7 @@ const router = express.Router();
 router.use(requireAuth);
 router.use(requireMinRole('finance'));
 
-// ── Palette (Agthia sage-green brand) ─────────────────────────────────────────
+// ── Palette (Agthia sage-green brand) ───────────────────────────────────────────
 const C = {
   ink:      'FF0F172A', // slate-900 — title bar
   brand:    'FF62833A', // brand-600 — column headers
@@ -435,7 +435,7 @@ router.get('/', async (req, res) => {
       });
     }
 
-    // ─── Send ──────────────────────────────────────────────────────────────────────
+    // ─── Send ────────────────────────────────────────────────────────────────────
     const safeName = dateRange.replace(/[^a-zA-Z0-9\-]/g, '_');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="AgthiaPettyCash_${safeName}.xlsx"`);
