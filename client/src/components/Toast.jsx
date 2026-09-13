@@ -26,21 +26,27 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none" style={{ maxWidth: 360 }}>
+      <div className="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-[360px] z-50 flex flex-col gap-2 pointer-events-none">
         {toasts.map(t => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-lg shadow-card-hover border text-sm font-medium animate-slide-up
-              ${t.type === 'success' ? 'bg-white border-emerald-200 text-emerald-800' :
-                t.type === 'error'   ? 'bg-white border-red-200 text-red-800' :
-                                       'bg-white border-paper-400 text-ink-800'}`}
+            className={`pointer-events-auto flex items-start gap-3 px-4 py-3 border-2 border-ink-900 text-sm font-bold animate-rise
+              ${t.type === 'success' ? 'bg-green-500 text-ink-900' :
+                t.type === 'error'   ? 'bg-flare-500 text-ink-900' :
+                                       'bg-blue-600 text-white'}`}
           >
-            {t.type === 'success' && <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />}
-            {t.type === 'error'   && <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />}
-            {t.type === 'info'    && <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />}
+            {t.type === 'success' && <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" strokeWidth={2.25} />}
+            {t.type === 'error'   && <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" strokeWidth={2.25} />}
+            {t.type === 'info'    && <Info className="w-4 h-4 flex-shrink-0 mt-0.5" strokeWidth={2.25} />}
             <span className="flex-1 leading-snug">{t.message}</span>
-            <button onClick={() => remove(t.id)} className="text-ink-300 hover:text-ink-600 flex-shrink-0 transition-colors">
-              <X className="w-3.5 h-3.5" />
+            <button
+              onClick={() => remove(t.id)}
+              aria-label="Dismiss"
+              className={`flex-shrink-0 -mr-1 p-0.5 transition-colors duration-[120ms] ${
+                t.type === 'info' ? 'text-white/70 hover:text-white' : 'text-ink-900/60 hover:text-ink-900'
+              }`}
+            >
+              <X className="w-4 h-4" strokeWidth={2.25} />
             </button>
           </div>
         ))}

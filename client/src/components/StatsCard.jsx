@@ -34,74 +34,93 @@ function useCountUp(target, duration = 900) {
   return display;
 }
 
+// Four tiles, one per ink plus the paper default.
+// On flare-500 and green-500 the text is ink-900 — white on those fills fails.
 const VARIANTS = {
-  green: {
-    wrap:   'bg-brand-600 border-none',
-    label:  'text-brand-200',
-    val:    'text-white',
-    sub:    'text-brand-200',
-    icon:   'bg-white/15 text-white',
+  // White field inside a 2px ink rule.
+  default: {
+    wrap:  'bg-white border-ink-900',
+    label: 'text-ink-500',
+    val:   'text-ink-900',
+    sub:   'text-ink-400',
+    icon:  'border-ink-900 text-ink-900',
+    up:    'text-flare-700',
+    down:  'text-green-700',
+    flat:  'text-ink-500',
   },
   blue: {
-    wrap:   'border-l-[3px] border-l-blue-400',
-    label:  'text-blue-600',
-    val:    'text-ink-900',
-    sub:    'text-ink-400',
-    icon:   'bg-blue-50 text-blue-500',
+    wrap:  'bg-blue-600 border-blue-600',
+    label: 'text-white/75',
+    val:   'text-white',
+    sub:   'text-blue-200',
+    icon:  'border-white/45 text-white',
+    up:    'text-white',
+    down:  'text-white',
+    flat:  'text-blue-200',
   },
-  amber: {
-    wrap:   'border-l-[3px] border-l-amber-400',
-    label:  'text-amber-600',
-    val:    'text-ink-900',
-    sub:    'text-ink-400',
-    icon:   'bg-amber-50 text-amber-500',
+  flare: {
+    wrap:  'bg-flare-500 border-flare-500',
+    label: 'text-ink-900',
+    val:   'text-ink-900',
+    sub:   'text-ink-800',
+    icon:  'border-ink-900 text-ink-900',
+    up:    'text-ink-900',
+    down:  'text-ink-900',
+    flat:  'text-ink-800',
   },
-  violet: {
-    wrap:   'border-l-[3px] border-l-violet-400',
-    label:  'text-violet-600',
-    val:    'text-ink-900',
-    sub:    'text-ink-400',
-    icon:   'bg-violet-50 text-violet-500',
+  green: {
+    wrap:  'bg-green-500 border-green-500',
+    label: 'text-ink-900',
+    val:   'text-ink-900',
+    sub:   'text-ink-800',
+    icon:  'border-ink-900 text-ink-900',
+    up:    'text-ink-900',
+    down:  'text-ink-900',
+    flat:  'text-ink-800',
   },
 };
 
-export default function StatsCard({ title, value, sub, icon: Icon, trend, trendLabel, variant = 'blue', monoValue = false }) {
-  const v = VARIANTS[variant] || VARIANTS.blue;
+// Legacy variant names from the previous design system, kept so existing call
+// sites keep rendering. `amber`/`violet` had no counterpart ink.
+const ALIASES = { amber: 'flare', violet: 'default', white: 'default', plate: 'default' };
+
+export default function StatsCard({ title, value, sub, icon: Icon, trend, trendLabel, variant = 'default', monoValue = false }) {
+  const v = VARIANTS[ALIASES[variant] || variant] || VARIANTS.default;
   const animatedValue = useCountUp(value);
   const isPos = parseFloat(trend) > 0;
   const isNeg = parseFloat(trend) < 0;
 
   return (
-    <div className={cn('card p-5 hover:shadow-card-hover transition-all duration-300', v.wrap)}>
-      <div className="flex items-start justify-between mb-3">
-        <p className={cn('text-[11px] font-semibold uppercase tracking-widest', v.label)}>{title}</p>
+    <div className={cn('h-full p-5 border-2', v.wrap)}>
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <p className={cn('label mb-0', v.label)}>{title}</p>
         {Icon && (
-          <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', v.icon)}>
-            <Icon className="w-[17px] h-[17px]" />
+          <div className={cn('w-8 h-8 border-2 flex items-center justify-center flex-shrink-0', v.icon)}>
+            <Icon className="w-4 h-4" strokeWidth={2.25} />
           </div>
         )}
       </div>
 
       <p className={cn(
-        'text-[1.55rem] font-bold tracking-tight leading-none mb-1.5',
-        monoValue ? 'font-mono tabular-nums' : 'font-heading',
+        'display w-wider text-2xl sm:text-3xl mb-2',
+        // Fragment Mono is single weight — never bold it.
+        monoValue && 'font-mono font-normal tracking-normal',
         v.val
       )}>
         {animatedValue}
       </p>
 
-      {sub && <p className={cn('text-xs', v.sub)}>{sub}</p>}
+      {sub && <p className={cn('text-sm', v.sub)}>{sub}</p>}
 
       {trend !== undefined && trend !== null && (
-        <div className="mt-2.5 flex items-center gap-1.5">
-          <span className={cn(
-            'stat-pill',
-            isPos ? 'bg-red-100 text-red-600' : isNeg ? 'bg-emerald-100 text-emerald-700' : 'bg-paper-300 text-ink-500'
-          )}>
-            {isPos ? <TrendingUp className="w-3 h-3" /> : isNeg ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+        <div className="mt-3 flex items-center gap-1.5 font-mono text-xs">
+          <span className={cn('inline-flex items-center gap-1', isPos ? v.up : isNeg ? v.down : v.flat)}>
+            {isPos ? <TrendingUp className="w-3.5 h-3.5" strokeWidth={2.25} />
+              : isNeg ? <TrendingDown className="w-3.5 h-3.5" strokeWidth={2.25} />
+              : <Minus className="w-3.5 h-3.5" strokeWidth={2.25} />}
             {Math.abs(parseFloat(trend))}%
           </span>
-          {trendLabel && <span className={cn('text-xs', v.sub)}>{trendLabel}</span>}
+          {trendLabel && <span className={v.sub}>{trendLabel}</span>}
         </div>
       )}
     </div>
