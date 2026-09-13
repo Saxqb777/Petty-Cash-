@@ -18,9 +18,17 @@ postgresql://user:pass@ep-xxxx-pooler.region.aws.neon.tech/neondb?sslmode=requir
 
 The direct (non-pooled) string will exhaust connections once more than a handful of function invocations run at once. This matters here because `withTransaction` opens a real connection.
 
-## 2. Create the Blob store
+## 2. Create the Blob store, then connect it
 
-Vercel → Storage → Create → Blob. Copy `BLOB_READ_WRITE_TOKEN` from the store's `.env.local` tab.
+Vercel → Storage → Create → Blob.
+
+**Creating the store is not enough.** It has to be connected to the project as a separate action, and only that connection injects `BLOB_READ_WRITE_TOKEN`:
+
+Project → **Storage** → **Connect Store** → pick the Blob store → Connect.
+
+**Then redeploy.** Environment variables are injected at build time, so a deployment that already exists never picks up a variable added after it was built. Connecting the store to a live project changes nothing until the next build.
+
+The symptom when either step is missed is identical and misleading: `/api/health` reports `BLOB_READ_WRITE_TOKEN` missing while the Vercel dashboard shows the store sitting there, apparently fine.
 
 ## 3. Import the repo into Vercel
 
