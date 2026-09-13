@@ -1,41 +1,27 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const crypto = require('crypto');
-const { parseReceiptFile } = require('../utils/parser');
-const { UPLOADS_DIR } = require('../config/paths');
-const db = require('../db/database');
+const { put } = require('@vercel/blob');
+const { parseReceiptBuffer } = require('../utils/parser');
+const { one } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 router.use(requireAuth);
 
-// SHA-256 of a file on disk — used for content-based duplicate detection
-function hashFile(filePath) {
-  const buf = fs.readFileSync(filePath);
-  return crypto.createHash('sha256').update(buf).digest('hex');
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-    cb(null, UPLOADS_DIR);
-  },
-  filename: (req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${unique}${path.extname(file.originalname)}`);
-  }
-});
+// Serverless functions have no writable disk worth using and the file has to be
+// in memory anyway (hashing, Claude extraction, blob upload), so multer keeps
+// the whole 15 MB in a Buffer.
+const ALLOWED_EXT = /\.(jpe?g|png|webp|pdf)$/i;
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowed = /jpeg|jpg|png|gif|webp|pdf/i;
-    if (allowed.test(path.extname(file.originalname))) cb(null, true);
+    if (ALLOWED_EXT.test(file.originalname || '')) cb(null, true);
     else cb(new Error('Only images (JPG, PNG, WebP) and PDFs are supported'));
-  }
+  },
 });
 
 const FALLBACK = {
@@ -43,94 +29,93 @@ const FALLBACK = {
   date: new Date().toISOString().split('T')[0],
   category: 'Miscellaneous', business_unit: null,
   payment_method: 'Cash', purpose: '', submitted_by: null,
-  line_items: [], notes: null, invoice_number: null
+  line_items: [], notes: null, invoice_number: null,
 };
 
-// Clean up ONLY orphaned uploads (no expense references them) older than 7 days.
-// Receipts linked to an expense via image_path are kept FOREVER — for a finance
-// app the receipt is the audit trail and must never be auto-deleted.
-function cleanOldUploads() {
-  let removed = 0;
-  try {
-    // Build the set of filenames still referenced by any expense.image_path
-    const referenced = new Set();
-    db.prepare("SELECT image_path FROM expenses WHERE image_path IS NOT NULL AND image_path != ''")
-      .all()
-      .forEach(r => referenced.add(path.basename(r.image_path)));
+// NOTE: there is no upload-cleanup job any more. Receipts live in Vercel Blob
+// and are the audit trail for a finance app — they are kept for the life of the
+// record. (The old 7-day orphan sweep only ever deleted unreferenced files; on
+// Blob those are rare enough to prune manually.)
 
-    const files = fs.readdirSync(UPLOADS_DIR);
-    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    files.forEach(f => {
-      if (f === '.gitkeep') return;
-      if (referenced.has(f)) return;            // linked to a record — never delete
-      const fp = path.join(UPLOADS_DIR, f);
-      const stat = fs.statSync(fp);
-      if (stat.mtimeMs < cutoff) { fs.unlinkSync(fp); removed++; }
+router.post(
+  '/',
+  (req, res, next) => {
+    upload.single('bill')(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      next();
     });
-  } catch (e) {
-    console.warn('[uploads] cleanup error:', e.message);
-  }
-  return removed;
-}
-
-// Run cleanup at startup (log the result) and once a day thereafter
-const cleanedAtBoot = cleanOldUploads();
-console.log(`[uploads] orphan cleanup at boot: ${cleanedAtBoot} file(s) removed (linked receipts are kept forever)`);
-setInterval(cleanOldUploads, 24 * 60 * 60 * 1000);
-
-router.post('/', (req, res, next) => {
-  upload.single('bill')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
-    next();
-  });
-}, async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    if (req.file.size === 0) return res.status(400).json({ error: 'Uploaded file is empty' });
-
-    const expenseType = req.body.expense_type || 'general';
-
-    // Look up custom type schema if this is a non-builtin type
-    let customSchema = null;
-    let customAiHints = null;
-    const typeRow = db.prepare(
-      'SELECT * FROM expense_types WHERE org_id = ? AND slug = ? AND is_archived = 0'
-    ).get(req.user.org_id, expenseType);
-    if (typeRow && !typeRow.is_builtin) {
-      try {
-        customSchema = JSON.parse(typeRow.fields_schema || '[]');
-        customAiHints = typeRow.ai_hints;
-      } catch (_) {}
-    }
-
-    // Content hash for duplicate detection (same bytes = same receipt)
-    const file_hash = hashFile(req.file.path);
-    const existingByHash = db.prepare(
-      'SELECT id, vendor_name, amount, date FROM expenses WHERE file_hash = ? AND org_id = ?'
-    ).get(file_hash, req.user.org_id);
-
-    let parsed = { ...FALLBACK };
-    let parseError = null;
+  },
+  async (req, res) => {
     try {
-      parsed = await parseReceiptFile(req.file.path, req.file.originalname, expenseType, customSchema, customAiHints);
-    } catch (err) {
-      console.warn('Claude parse failed:', err.message);
-      parseError = err.message;
-    }
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+      const buffer = req.file.buffer;
+      if (!buffer || buffer.length === 0) return res.status(400).json({ error: 'Uploaded file is empty' });
 
-    res.json({
-      image_path: `/uploads/${req.file.filename}`,
-      file_hash,
-      duplicate: existingByHash
-        ? { type: 'exact', existingId: existingByHash.id, vendor: existingByHash.vendor_name, amount: existingByHash.amount, date: existingByHash.date }
-        : null,
-      parsed,
-      parseError
-    });
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ error: error.message });
+      if (!process.env.BLOB_READ_WRITE_TOKEN) {
+        return res.status(500).json({ error: 'BLOB_READ_WRITE_TOKEN is not set — receipt storage is unavailable.' });
+      }
+
+      const orgId = req.user.org_id;
+      const expenseType = req.body.expense_type || 'general';
+
+      // Look up the custom type schema if this is a non-builtin type
+      let customSchema = null;
+      let customAiHints = null;
+      const typeRow = await one(
+        'SELECT * FROM expense_types WHERE org_id = $1 AND slug = $2 AND is_archived = FALSE',
+        [orgId, expenseType]
+      );
+      if (typeRow && !typeRow.is_builtin) {
+        try {
+          customSchema = JSON.parse(typeRow.fields_schema || '[]');
+          customAiHints = typeRow.ai_hints;
+        } catch (_) { /* fall back to the built-in prompt */ }
+      }
+
+      // Content hash for duplicate detection (same bytes = same receipt)
+      const file_hash = crypto.createHash('sha256').update(buffer).digest('hex');
+      const existingByHash = await one(
+        'SELECT id, vendor_name, amount, date FROM expenses WHERE file_hash = $1 AND org_id = $2',
+        [file_hash, orgId]
+      );
+
+      // Tenant-scoped pathname so orgs can never collide on a filename.
+      const ext = (path.extname(req.file.originalname || '') || '.bin').toLowerCase();
+      const blob = await put(`org-${orgId}/${crypto.randomUUID()}${ext}`, buffer, {
+        access: 'public',
+        contentType: req.file.mimetype || undefined,
+        addRandomSuffix: false,
+      });
+
+      let parsed = { ...FALLBACK };
+      let parseError = null;
+      try {
+        parsed = await parseReceiptBuffer(buffer, req.file.originalname, expenseType, customSchema, customAiHints);
+      } catch (err) {
+        console.warn('Claude parse failed:', err.message);
+        parseError = err.message;
+      }
+
+      res.json({
+        image_path: blob.url,
+        file_hash,
+        duplicate: existingByHash
+          ? {
+              type: 'exact',
+              existingId: existingByHash.id,
+              vendor: existingByHash.vendor_name,
+              amount: existingByHash.amount,
+              date: existingByHash.date,
+            }
+          : null,
+        parsed,
+        parseError,
+      });
+    } catch (error) {
+      console.error('Upload error:', error);
+      res.status(error.status || 500).json({ error: error.message });
+    }
   }
-});
+);
 
 module.exports = router;
