@@ -1,7 +1,8 @@
 const express = require('express');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const db = require('../db/database');
+const { sql, withTransaction, isUniqueViolation } = require('../db');
+const { seedOrgDefaults } = require('../db/seed');
 const { requireAuthAny } = require('../middleware/auth');
 
 const router = express.Router();
@@ -22,11 +23,14 @@ function slugify(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
-function uniqueSlug(name) {
+// Resolves a free slug. Runs inside the signup transaction so the uniqueness
+// check and the insert cannot race with another signup.
+async function uniqueSlug(tx, name) {
   const base = slugify(name) || 'org';
   let slug = base;
   let i = 2;
-  while (db.prepare('SELECT id FROM organizations WHERE slug = ?').get(slug)) {
+  // eslint-disable-next-line no-await-in-loop
+  while (await tx.one('SELECT id FROM organizations WHERE slug = $1', [slug])) {
     slug = `${base}-${i++}`;
   }
   return slug;
@@ -49,66 +53,63 @@ router.post('/signup', async (req, res) => {
     }
 
     const normalEmail = email.trim().toLowerCase();
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(normalEmail);
-    if (existing) return res.status(409).json({ error: 'An account with this email already exists' });
+    const existing = await sql`SELECT id FROM users WHERE LOWER(email) = ${normalEmail}`;
+    if (existing.length) return res.status(409).json({ error: 'An account with this email already exists' });
 
     const password_hash = await bcrypt.hash(password, 12);
 
-    const doSignup = db.transaction(() => {
-      const userResult = db.prepare(
-        'INSERT INTO users (email, password_hash, full_name) VALUES (?, ?, ?)'
-      ).run(normalEmail, password_hash, full_name.trim().slice(0, 100));
-
-      const userId = userResult.lastInsertRowid;
+    const { userId, orgId, status, role } = await withTransaction(async (tx) => {
+      const user = await tx.one(
+        'INSERT INTO users (email, password_hash, full_name) VALUES ($1, $2, $3) RETURNING id',
+        [normalEmail, password_hash, full_name.trim().slice(0, 100)]
+      );
 
       if (action === 'create') {
-        if (!org_name?.trim()) throw new Error('org_name is required when creating an org');
-        const slug = uniqueSlug(org_name);
-        const orgResult = db.prepare(
-          'INSERT INTO organizations (name, slug) VALUES (?, ?)'
-        ).run(org_name.trim().slice(0, 100), slug);
+        if (!org_name?.trim()) throw Object.assign(new Error('org_name is required when creating an org'), { status: 400 });
 
-        const orgId = orgResult.lastInsertRowid;
+        const slug = await uniqueSlug(tx, org_name);
+        const org = await tx.one(
+          'INSERT INTO organizations (name, slug) VALUES ($1, $2) RETURNING id',
+          [org_name.trim().slice(0, 100), slug]
+        );
 
-        // Seed exchange rates for new org
-        db.prepare('INSERT OR IGNORE INTO settings (key, value, org_id) VALUES (?, ?, ?)')
-          .run('exchange_rates', '{"USD":3.6725,"EUR":4.02,"GBP":4.68,"SAR":0.98,"QAR":1.01,"KWD":11.96,"OMR":9.53,"INR":0.044}', orgId);
+        // Default exchange rates + built-in expense types for the new org.
+        await seedOrgDefaults(org.id, tx);
 
-        // Seed default expense types for new org
-        db.seedExpenseTypesForOrg(orgId);
+        await tx.query(
+          `INSERT INTO memberships (user_id, org_id, role, status) VALUES ($1, $2, 'owner', 'active')`,
+          [user.id, org.id]
+        );
 
-        db.prepare(
-          'INSERT INTO memberships (user_id, org_id, role, status) VALUES (?, ?, ?, ?)'
-        ).run(userId, orgId, 'owner', 'active');
-
-        return { userId, orgId, status: 'active', role: 'owner' };
-      } else {
-        // join — create pending membership
-        if (!org_id) throw new Error('org_id is required when joining an org');
-        const org = db.prepare('SELECT id FROM organizations WHERE id = ?').get(org_id);
-        if (!org) throw new Error('Organization not found');
-
-        db.prepare(
-          'INSERT OR IGNORE INTO memberships (user_id, org_id, role, status) VALUES (?, ?, ?, ?)'
-        ).run(userId, org_id, 'member', 'pending');
-
-        return { userId, orgId: org_id, status: 'pending', role: 'member' };
+        return { userId: user.id, orgId: org.id, status: 'active', role: 'owner' };
       }
-    });
 
-    const { userId, orgId, status, role } = doSignup();
+      // join — create a pending membership
+      if (!org_id) throw Object.assign(new Error('org_id is required when joining an org'), { status: 400 });
+      const org = await tx.one('SELECT id FROM organizations WHERE id = $1', [Number(org_id) || 0]);
+      if (!org) throw Object.assign(new Error('Organization not found'), { status: 404 });
+
+      await tx.query(
+        `INSERT INTO memberships (user_id, org_id, role, status) VALUES ($1, $2, 'member', 'pending')
+         ON CONFLICT (user_id, org_id) DO NOTHING`,
+        [user.id, org.id]
+      );
+
+      return { userId: user.id, orgId: org.id, status: 'pending', role: 'member' };
+    });
 
     // Create session
     const token = generateToken();
-    db.prepare(
-      `INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, datetime('now', '+30 days'))`
-    ).run(token, userId);
+    await sql`INSERT INTO sessions (id, user_id, expires_at) VALUES (${token}, ${userId}, NOW() + INTERVAL '30 days')`;
 
     res.cookie('session', token, COOKIE_OPTS);
-    res.status(201).json({ status, role, org_id: orgId, message: status === 'pending' ? 'Request sent — waiting for approval' : 'Account created' });
+    res.status(201).json({
+      status, role, org_id: orgId,
+      message: status === 'pending' ? 'Request sent — waiting for approval' : 'Account created',
+    });
   } catch (err) {
-    if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'Email already registered' });
-    res.status(400).json({ error: err.message });
+    if (isUniqueViolation(err)) return res.status(409).json({ error: 'Email already registered' });
+    res.status(err.status || 400).json({ error: err.message });
   }
 });
 
@@ -118,29 +119,30 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'email and password required' });
 
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.trim().toLowerCase());
+    const normalEmail = email.trim().toLowerCase();
+    const user = (await sql`SELECT * FROM users WHERE LOWER(email) = ${normalEmail}`)[0];
     if (!user) return res.status(401).json({ error: 'Invalid email or password' });
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid email or password' });
 
-    // Check membership status
-    const membership = db.prepare(
-      `SELECT m.*, o.name as org_name, o.slug, o.accent_color
-       FROM memberships m JOIN organizations o ON o.id = m.org_id
-       WHERE m.user_id = ? ORDER BY m.status = 'active' DESC LIMIT 1`
-    ).get(user.id);
+    // Check membership status — prefer an active membership over a pending one.
+    const membership = (await sql`
+      SELECT m.*, o.name AS org_name, o.slug, o.accent_color
+      FROM memberships m JOIN organizations o ON o.id = m.org_id
+      WHERE m.user_id = ${user.id}
+      ORDER BY (m.status = 'active') DESC
+      LIMIT 1`)[0];
 
     const token = generateToken();
-    db.prepare(
-      `INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, datetime('now', '+30 days'))`
-    ).run(token, user.id);
+    await sql`INSERT INTO sessions (id, user_id, expires_at) VALUES (${token}, ${user.id}, NOW() + INTERVAL '30 days')`;
 
     res.cookie('session', token, COOKIE_OPTS);
     res.json({
       id: user.id,
       email: user.email,
       full_name: user.full_name,
+      is_superadmin: !!user.is_superadmin,
       membership: membership ? {
         status: membership.status,
         role: membership.role,
@@ -155,30 +157,37 @@ router.post('/login', async (req, res) => {
 });
 
 // ── POST /auth/logout ─────────────────────────────────────────────────────────
-router.post('/logout', (req, res) => {
-  const token = req.cookies?.session;
-  if (token) db.prepare('DELETE FROM sessions WHERE id = ?').run(token);
-  res.clearCookie('session', { path: '/' });
-  res.json({ success: true });
+router.post('/logout', async (req, res) => {
+  try {
+    const token = req.cookies?.session;
+    if (token) await sql`DELETE FROM sessions WHERE id = ${token}`;
+    res.clearCookie('session', { path: '/' });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── GET /auth/me ──────────────────────────────────────────────────────────────
-router.get('/me', requireAuthAny, (req, res) => {
-  const memberships = db.prepare(
-    `SELECT m.role, m.status, m.org_id, o.name as org_name, o.slug, o.accent_color
-     FROM memberships m JOIN organizations o ON o.id = m.org_id
-     WHERE m.user_id = ?`
-  ).all(req.user.id);
+router.get('/me', requireAuthAny, async (req, res) => {
+  try {
+    const memberships = await sql`
+      SELECT m.role, m.status, m.org_id, o.name AS org_name, o.slug, o.accent_color
+      FROM memberships m JOIN organizations o ON o.id = m.org_id
+      WHERE m.user_id = ${req.user.id}`;
 
-  const userRow = db.prepare('SELECT is_superadmin FROM users WHERE id = ?').get(req.user.id);
+    const userRow = (await sql`SELECT is_superadmin FROM users WHERE id = ${req.user.id}`)[0];
 
-  res.json({ ...req.user, memberships, is_superadmin: !!userRow?.is_superadmin });
+    res.json({ ...req.user, memberships, is_superadmin: !!userRow?.is_superadmin });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// ── GET /auth/orgs — list orgs for join dropdown ──────────────────────────────
-router.get('/orgs', (req, res) => {
+// ── GET /auth/orgs — list orgs for the join dropdown ──────────────────────────
+router.get('/orgs', async (req, res) => {
   try {
-    const orgs = db.prepare('SELECT id, name, slug FROM organizations ORDER BY name ASC').all();
+    const orgs = await sql`SELECT id, name, slug FROM organizations ORDER BY name ASC`;
     res.json(orgs);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -186,11 +195,9 @@ router.get('/orgs', (req, res) => {
 });
 
 // ── POST /auth/cancel-request — pending user cancels their join request ───────
-router.post('/cancel-request', requireAuthAny, (req, res) => {
+router.post('/cancel-request', requireAuthAny, async (req, res) => {
   try {
-    db.prepare(
-      `DELETE FROM memberships WHERE user_id = ? AND status = 'pending'`
-    ).run(req.user.id);
+    await sql`DELETE FROM memberships WHERE user_id = ${req.user.id} AND status = 'pending'`;
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

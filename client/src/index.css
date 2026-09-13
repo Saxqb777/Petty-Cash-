@@ -1,68 +1,205 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,400..800;1,62..125,400..700&family=Fragment+Mono:ital@0;1&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   OVERPRINT — Doc Ledger design system
+
+   Two-ink risograph logic: flat spot colours that multiply where they cross,
+   hard rectangles at zero radius, 2px structural rules, no shadow anywhere.
+
+   ── CONTRAST RULES (measured, not guessed) ────────────────────────────────
+   These exist because the obvious choices fail. Follow them literally.
+
+     ON PAPER (#EDECE8) / WHITE
+       body text .......... ink-900            15.8:1
+       secondary text ..... ink-500 (floor)     5.6:1
+       meta / captions .... ink-400             4.3:1
+       ink-300 ............ placeholders + large text ONLY (3.0:1)
+       ink-200 ............ rules and disabled. NEVER text.
+       blue text .......... blue-600            8.7:1
+       flare text ......... flare-700 (NOT 500 — 500 is only 2.7:1)
+       green text ......... green-700 (NOT 500 — 500 is only 2.5:1)
+
+     ON FILLS
+       blue-600 fill ...... white text         10.7:1
+       flare-500 fill ..... ink-900 text        5.1:1
+                            (white on flare is 3.4:1 and FAILS — never do it)
+       green-500 fill ..... ink-900 text        5.4:1
+       ink-900 fill ....... paper-100 text     15.8:1
+
+   ── SIZE FLOOR ────────────────────────────────────────────────────────────
+     text-sm (13px) is the smallest size for anything a user must read.
+     text-xs / text-2xs are for uppercase labels and incidental metadata,
+     and both carry letter-spacing to stay legible at that size.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 @layer base {
   * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
   body {
-    font-family: 'Inter', system-ui, sans-serif;
-    background-color: #FAF8F4;
-    color: #1A1814;
+    font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14.5px;
+    line-height: 1.55;
+    background-color: #EDECE8;
+    color: #14141A;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-variant-numeric: tabular-nums;
   }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'DM Sans', system-ui, sans-serif;
+
+  /* Headings run on Archivo's width axis — the expansion is the voice of the
+     system, so it belongs in base rather than being re-applied per component. */
+  h1, h2, h3, h4 {
+    font-stretch: 112%;
     font-weight: 700;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  /* Visible keyboard focus everywhere, in the second ink so it never reads as
+     a blue border on a blue control. */
+  :focus-visible {
+    outline: 2px solid #FF4A17;
+    outline-offset: 1px;
+  }
+
+  ::selection { background: #FFC2AC; color: #14141A; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
 @layer components {
-  .card {
-    @apply bg-white rounded-lg border border-paper-400 shadow-card;
-  }
-  .btn-primary {
-    @apply bg-brand-600 hover:bg-brand-700 active:scale-[0.98] text-white font-semibold px-4 py-2.5 rounded-lg transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-  .btn-secondary {
-    @apply bg-white hover:bg-paper-200 active:scale-[0.98] text-ink-700 font-semibold px-4 py-2.5 rounded-lg border border-paper-400 transition-all duration-150;
-  }
-  .btn-danger {
-    @apply bg-white hover:bg-red-50 text-red-600 font-semibold px-4 py-2.5 rounded-lg border border-red-200 transition-all duration-150;
-  }
-  .input {
-    @apply w-full px-3.5 py-2.5 border border-paper-400 rounded-lg text-sm text-ink-800 focus:outline-none focus:ring-2 focus:ring-brand-500/25 focus:border-brand-400 transition-all duration-150 bg-white placeholder:text-ink-300;
+
+  /* ── Surfaces ─────────────────────────────────────────────────────────── */
+  /* Not everything is a card. `.plate` is the one structural container: a
+     white field inside a 2px ink rule. Use it for things that are genuinely
+     separate objects, not to box every paragraph. */
+  .plate      { @apply bg-white border-2 border-ink-900; }
+  .plate-blue { @apply bg-blue-600 border-2 border-blue-600 text-white; }
+  .plate-sub  { @apply bg-white border border-paper-400; }
+
+  /* ── Type roles ───────────────────────────────────────────────────────── */
+  .display {
+    font-stretch: 118%;
+    @apply font-extrabold tracking-[-0.03em] leading-none tabular-nums;
   }
   .label {
-    @apply block text-[11px] font-semibold text-ink-400 uppercase tracking-wider mb-1.5;
+    @apply block text-2xs font-bold uppercase text-ink-500 mb-2;
   }
-  .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold;
+  /* Uppercase micro-label sitting on an ink or blue fill. */
+  .label-inv {
+    @apply block text-2xs font-bold uppercase text-white/75 mb-2;
   }
-  .badge-green  { @apply badge bg-brand-100 text-brand-700; }
-  .badge-gray   { @apply badge bg-paper-300 text-ink-600; }
-  .badge-blue   { @apply badge bg-blue-50 text-blue-700; }
-  .badge-amber  { @apply badge bg-amber-50 text-amber-700; }
-  .stat-pill {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold;
+  .meta {
+    @apply font-mono text-xs text-ink-400;
   }
+
+  /* ── Buttons — rectangles, 2px rule, no radius, no scale on press ─────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5
+           text-sm font-bold border-2 transition-colors duration-[120ms]
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-primary { @apply btn bg-blue-600 border-blue-600 text-white hover:bg-blue-700 hover:border-blue-700; }
+  /* ink-900 on flare, never white — see contrast rules above. */
+  .btn-flare   { @apply btn bg-flare-500 border-flare-500 text-ink-900 hover:bg-flare-600 hover:border-flare-600; }
+  .btn-ghost   { @apply btn bg-white border-ink-900 text-ink-900 hover:bg-paper-100; }
+  .btn-quiet   { @apply btn bg-transparent border-paper-400 text-ink-600 hover:border-ink-900 hover:text-ink-900; }
+  .btn-danger  { @apply btn bg-white border-flare-700 text-flare-700 hover:bg-flare-500 hover:border-flare-500 hover:text-ink-900; }
+  .btn-sm      { @apply px-3 py-1.5 text-xs; }
+
+  /* ── Form controls ────────────────────────────────────────────────────── */
+  .input {
+    @apply w-full px-3 py-2.5 text-sm text-ink-900 bg-white
+           border-2 border-paper-400 placeholder:text-ink-300
+           transition-colors duration-[120ms]
+           focus:outline-none focus:border-blue-600;
+  }
+  .input:focus-visible { outline: none; }
+  .select { @apply input appearance-none pr-9 cursor-pointer; }
+  .textarea { @apply input leading-relaxed; }
+  .field-error { @apply border-flare-500; }
+
+  /* ── Status marks ─────────────────────────────────────────────────────── */
+  /* Three inks carry meaning. "Waiting" is deliberately uncoloured: an ink
+     outline on paper, because absence of ink is what waiting looks like. */
+  .tag {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5
+           font-mono text-2xs uppercase border;
+  }
+  .tag-wait    { @apply tag border-ink-900 text-ink-900 bg-transparent; }
+  .tag-blue    { @apply tag border-blue-600 text-blue-600 bg-blue-50; }
+  .tag-flare   { @apply tag border-flare-700 text-flare-700 bg-flare-50; }
+  .tag-green   { @apply tag border-green-700 text-green-700 bg-green-50; }
+  .tag-muted   { @apply tag border-paper-400 text-ink-500 bg-paper-50; }
+
+  /* Solid counterpart for when the mark must carry across a busy row. */
+  .tag-solid-blue  { @apply tag border-blue-600 bg-blue-600 text-white; }
+  .tag-solid-flare { @apply tag border-flare-500 bg-flare-500 text-ink-900; }
+  .tag-solid-green { @apply tag border-green-500 bg-green-500 text-ink-900; }
+
+  /* ── Ledger tables ────────────────────────────────────────────────────── */
+  .ledger      { @apply w-full bg-white border-2 border-ink-900 border-collapse; }
+  .ledger thead th {
+    @apply bg-ink-900 text-paper-100 text-2xs font-bold uppercase
+           text-left px-3 py-2 whitespace-nowrap;
+  }
+  .ledger tbody tr { @apply border-t border-paper-300; }
+  .ledger tbody tr:nth-child(even) { @apply bg-paper-50; }
+  .ledger tbody tr:hover { @apply bg-blue-50; }
+  .ledger td   { @apply px-3 py-2.5 text-sm align-middle; }
+  .amount      { @apply font-mono tabular-nums text-right whitespace-nowrap; }
+
+  /* ── Overprint: where two inks cross, they multiply ───────────────────── */
+  .overprint { mix-blend-mode: multiply; }
+
+  /* ── Loading ──────────────────────────────────────────────────────────── */
   .skeleton {
-    background: linear-gradient(90deg, #EDE8E0 25%, #E3DDD6 50%, #EDE8E0 75%);
+    background: linear-gradient(90deg, #E5E3DD 25%, #D8D5CD 50%, #E5E3DD 75%);
     background-size: 200% 100%;
-    @apply animate-shimmer rounded-lg;
+    @apply animate-sweep;
   }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #C8C3BC; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #9C9590; }
+@layer utilities {
+  /* Archivo's width axis, exposed as utilities. */
+  .w-normal   { font-stretch: 100%; }
+  .w-wide     { font-stretch: 112%; }
+  .w-wider    { font-stretch: 118%; }
+  .w-widest   { font-stretch: 125%; }
+  .w-narrow   { font-stretch: 88%; }
+}
 
-.fade-in { animation: fadeIn 0.2s ease-in-out; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+/* Scrollbars: square, ink, no radius. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #E5E3DD; }
+::-webkit-scrollbar-thumb { background: #14141A; }
+::-webkit-scrollbar-thumb:hover { background: #22356F; }
 
-.slide-up { animation: slideUp 0.3s ease-out; }
-@keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+/* Recharts overrides — the library ships rounded, shadowed defaults that
+   fight the system. Kept here rather than per-chart so every chart inherits. */
+.recharts-default-tooltip {
+  background: #14141A !important;
+  border: none !important;
+  border-radius: 0 !important;
+  color: #EDECE8 !important;
+  font-family: 'Fragment Mono', ui-monospace, monospace !important;
+  font-size: 11.5px !important;
+}
+.recharts-tooltip-item { color: #EDECE8 !important; }
+.recharts-cartesian-axis-tick text {
+  font-family: 'Fragment Mono', ui-monospace, monospace;
+  font-size: 10px;
+  fill: #6B6B75;
+}
+.recharts-cartesian-grid line { stroke: #D8D5CD; }
