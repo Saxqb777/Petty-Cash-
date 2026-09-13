@@ -60,28 +60,45 @@ const STANDARD_KEYS = new Set([
 
 const fmt = (n) => parseFloat(n || 0).toFixed(2);
 
-function Field({ label, children, span2 = false }) {
+/* Receipt sources arrive either as a local object URL, an absolute blob URL
+   (the backend is moving to https:// storage) or a legacy relative path. */
+const resolveAsset = (path) => {
+  if (!path) return '';
+  if (/^(https?:|blob:|data:)/i.test(path)) return path;
+  return path.startsWith('/') ? path : `/uploads/${path}`;
+};
+
+const EMPTY_FLAGS = new Set();
+
+// ─── Type roles ───────────────────────────────────────────────────────────────
+function Field({ label, children, span2 = false, flag = false, hint }) {
   return (
-    <div className={span2 ? 'col-span-2' : ''}>
-      <label className="label">{label}</label>
-      {children}
+    <div className={span2 ? 'sm:col-span-2' : ''}>
+      <div className={flag ? 'border-l-2 border-flare-500 pl-3' : ''}>
+        <div className="flex flex-wrap items-baseline gap-2 mb-1.5">
+          <span className={`text-sm font-bold ${flag ? 'text-flare-700' : 'text-ink-700'}`}>{label}</span>
+          {flag && <span className="tag-flare">Check</span>}
+        </div>
+        {children}
+        {hint && <p className="text-sm text-ink-500 mt-1.5">{hint}</p>}
+      </div>
     </div>
   );
 }
 
-function Sel({ value, onChange, options, placeholder = 'Select...' }) {
+function Sel({ value, onChange, options, placeholder = 'Select', mono = false }) {
   return (
     <div className="relative">
-      <select value={value} onChange={e => onChange(e.target.value)} className="input appearance-none pr-8 cursor-pointer">
+      <select value={value} onChange={e => onChange(e.target.value)} className={`select ${mono ? 'font-mono' : ''}`}>
         <option value="">{placeholder}</option>
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
-      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500 pointer-events-none" strokeWidth={2} />
     </div>
   );
 }
 
-function ChipInput({ chips, onChange, placeholder }) {
+function ChipInput({ chips, onChange, placeholder, label }) {
   const [val, setVal] = useState('');
   const add = () => {
     const t = val.trim().toUpperCase();
@@ -90,19 +107,25 @@ function ChipInput({ chips, onChange, placeholder }) {
   const remove = (chip) => onChange(chips.filter(c => c !== chip));
   return (
     <div>
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        {chips.map(c => (
-          <span key={c} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-xs font-mono font-medium border border-blue-100">
-            {c}
-            <button onClick={() => remove(c)} className="text-blue-400 hover:text-red-500"><X className="w-3 h-3" /></button>
-          </span>
-        ))}
-      </div>
+      {chips.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {chips.map(c => (
+            <span key={c} className="inline-flex items-center gap-2 pl-2 pr-1 py-0.5 bg-white border-2 border-ink-900 font-mono text-xs text-ink-900">
+              {c}
+              <button type="button" onClick={() => remove(c)} aria-label={`Remove ${c}`}
+                className="text-ink-500 hover:text-flare-700 transition-colors duration-[120ms]">
+                <X className="w-3 h-3" strokeWidth={2.5} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       <div className="flex gap-2">
-        <input className="input flex-1 text-sm font-mono" value={val} onChange={e => setVal(e.target.value)}
+        <input className="input flex-1 font-mono" value={val} onChange={e => setVal(e.target.value)}
+          aria-label={label || placeholder}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} placeholder={placeholder} />
-        <button type="button" onClick={add} className="btn-secondary text-xs flex items-center gap-1 flex-shrink-0 px-2.5">
-          <Plus className="w-3 h-3" /> Add
+        <button type="button" onClick={add} className="btn-ghost btn-sm flex-shrink-0">
+          <Plus className="w-3.5 h-3.5" strokeWidth={2.5} /> Add
         </button>
       </div>
     </div>
@@ -115,101 +138,139 @@ function CurrencyAmount({ amount, currency, onAmount, onCurrency, rates }) {
   return (
     <div>
       <div className="flex gap-2">
-        <input className="input flex-1" type="number" step="0.01" value={amount} onChange={e => onAmount(e.target.value)} placeholder="0.00" />
-        <div className="relative w-28 flex-shrink-0">
-          <select value={currency} onChange={e => onCurrency(e.target.value)} className="input appearance-none pr-7 cursor-pointer">
+        <input className="input flex-1 font-mono text-right" type="number" step="0.01" value={amount}
+          aria-label="Amount" onChange={e => onAmount(e.target.value)} placeholder="0.00" />
+        <div className="relative w-24 flex-shrink-0">
+          <select value={currency} onChange={e => onCurrency(e.target.value)} className="select font-mono pr-8" aria-label="Currency">
             {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-500 pointer-events-none" strokeWidth={2} />
         </div>
       </div>
       {aedPreview !== null && (
-        <p className="text-xs text-amber-600 mt-1 font-medium">
-          ≈ AED {aedPreview.toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          <span className="text-gray-400 font-normal ml-1">(rate: {rate})</span>
+        <p className="font-mono text-xs text-ink-500 mt-1.5">
+          = AED {aedPreview.toLocaleString('en-AE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <span className="text-ink-400 ml-2">rate {rate}</span>
         </p>
       )}
     </div>
   );
 }
 
+/* A group of fields, separated by a rule rather than boxed in a card. */
+function Group({ title, children, note }) {
+  return (
+    <section className="border-t-2 border-ink-900 pt-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+        <p className="label mb-0">{title}</p>
+        {note && <p className="text-sm text-ink-500">{note}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+const GRID = 'grid grid-cols-1 sm:grid-cols-2 gap-4';
+
 // ─── Dynamic Form (for custom expense types) ──────────────────────────────────
-function DynamicForm({ fields, values, onChange, rates }) {
+function DynamicForm({ fields, values, onChange, rates, flags = EMPTY_FLAGS }) {
   const set = (key, val) => onChange({ ...values, [key]: val });
 
   return (
-    <div className="grid grid-cols-2 gap-4">
-      {fields.filter(f => f.type !== 'charges').map(field => {
-        const wide = ['textarea', 'chips'].includes(field.type) ||
-          ['purpose', 'notes', 'description'].includes(field.key);
-        return (
-          <Field key={field.key} label={field.label} span2={wide}>
-            {field.type === 'currency' ? (
-              <CurrencyAmount
-                amount={values.amount || ''}
-                currency={values.currency || 'AED'}
-                onAmount={v => set('amount', v)}
-                onCurrency={v => set('currency', v)}
-                rates={rates}
-              />
-            ) : field.type === 'select' ? (
-              <Sel value={values[field.key] || ''} onChange={v => set(field.key, v)}
-                options={field.options || []} placeholder={field.placeholder || `Select ${field.label}...`} />
-            ) : field.type === 'date' ? (
-              <input className="input" type="date" value={values[field.key] || ''} onChange={e => set(field.key, e.target.value)} />
-            ) : field.type === 'textarea' ? (
-              <textarea className="input resize-none" rows={2} value={values[field.key] || ''}
-                onChange={e => set(field.key, e.target.value)} placeholder={field.placeholder || ''} />
-            ) : field.type === 'number' ? (
-              <input className="input" type="number" step="0.01" value={values[field.key] || ''}
-                onChange={e => set(field.key, e.target.value)} placeholder={field.placeholder || '0'} />
-            ) : field.type === 'chips' ? (
-              <ChipInput chips={values[field.key] || []}
-                onChange={v => set(field.key, v)} placeholder={field.placeholder || 'Add...'} />
-            ) : (
-              <input className="input" value={values[field.key] || ''}
-                onChange={e => set(field.key, e.target.value)} placeholder={field.placeholder || ''} />
-            )}
-          </Field>
-        );
-      })}
-    </div>
+    <Group title="Details">
+      <div className={GRID}>
+        {fields.filter(f => f.type !== 'charges').map(field => {
+          const wide = ['textarea', 'chips'].includes(field.type) ||
+            ['purpose', 'notes', 'description'].includes(field.key);
+          return (
+            <Field key={field.key} label={field.label} span2={wide} flag={flags.has(field.key)}>
+              {field.type === 'currency' ? (
+                <CurrencyAmount
+                  amount={values.amount || ''}
+                  currency={values.currency || 'AED'}
+                  onAmount={v => set('amount', v)}
+                  onCurrency={v => set('currency', v)}
+                  rates={rates}
+                />
+              ) : field.type === 'select' ? (
+                <Sel value={values[field.key] || ''} onChange={v => set(field.key, v)}
+                  options={field.options || []} placeholder={field.placeholder || `Select ${field.label}`} />
+              ) : field.type === 'date' ? (
+                <input className="input font-mono" type="date" aria-label={field.label}
+                  value={values[field.key] || ''} onChange={e => set(field.key, e.target.value)} />
+              ) : field.type === 'textarea' ? (
+                <textarea className="textarea resize-none" rows={2} value={values[field.key] || ''} aria-label={field.label}
+                  onChange={e => set(field.key, e.target.value)} placeholder={field.placeholder || ''} />
+              ) : field.type === 'number' ? (
+                <input className="input font-mono text-right" type="number" step="0.01" value={values[field.key] || ''}
+                  aria-label={field.label}
+                  onChange={e => set(field.key, e.target.value)} placeholder={field.placeholder || '0'} />
+              ) : field.type === 'chips' ? (
+                <ChipInput chips={values[field.key] || []} label={field.label}
+                  onChange={v => set(field.key, v)} placeholder={field.placeholder || 'Add'} />
+              ) : (
+                <input className="input" value={values[field.key] || ''} aria-label={field.label}
+                  onChange={e => set(field.key, e.target.value)} placeholder={field.placeholder || ''} />
+              )}
+            </Field>
+          );
+        })}
+      </div>
+    </Group>
   );
 }
 
 // ─── ADNOC Form ───────────────────────────────────────────────────────────────
-function AdnocForm({ form, set, rates }) {
+function AdnocForm({ form, set, rates, flags = EMPTY_FLAGS }) {
   return (
-    <div className="grid grid-cols-2 gap-4">
-      <Field label="Invoice / Receipt No.">
-        <input className="input" value={form.invoice_number} onChange={e => set('invoice_number', e.target.value)} placeholder="e.g. 15051" />
-      </Field>
-      <Field label="Date">
-        <input className="input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
-      </Field>
-      <Field label="Amount">
-        <CurrencyAmount amount={form.amount} currency={form.currency}
-          onAmount={v => set('amount', v)} onCurrency={v => set('currency', v)} rates={rates} />
-      </Field>
-      <Field label="Payment Method">
-        <Sel value={form.payment_method} onChange={v => set('payment_method', v)} options={['Card', 'Cash']} />
-      </Field>
-      <Field label="Business Unit">
-        <Sel value={form.business_unit} onChange={v => set('business_unit', v)} options={BUS} placeholder="Select BU" />
-      </Field>
-      <Field label="Submitted By">
-        <input className="input" value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} placeholder="Name" />
-      </Field>
-      <Field label="Trip / Route Details" span2>
-        <div className="relative">
-          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-          <input className="input pl-9" value={form.purpose} onChange={e => set('purpose', e.target.value)}
-            placeholder="e.g. Abu Dhabi Airport — HUSKY Air Shipment Collection" />
+    <div className="space-y-6">
+      <Group title="Receipt">
+        <div className={GRID}>
+          <Field label="Invoice / receipt no." flag={flags.has('invoice_number')}>
+            <input className="input font-mono" value={form.invoice_number} aria-label="Invoice or receipt number"
+              onChange={e => set('invoice_number', e.target.value)} placeholder="15051" />
+          </Field>
+          <Field label="Date" flag={flags.has('date')}>
+            <input className="input font-mono" type="date" aria-label="Date" value={form.date} onChange={e => set('date', e.target.value)} />
+          </Field>
+          <Field label="Amount" flag={flags.has('amount') || flags.has('currency')}>
+            <CurrencyAmount amount={form.amount} currency={form.currency}
+              onAmount={v => set('amount', v)} onCurrency={v => set('currency', v)} rates={rates} />
+          </Field>
+          <Field label="Payment method" flag={flags.has('payment_method')}>
+            <Sel value={form.payment_method} onChange={v => set('payment_method', v)} options={['Card', 'Cash']} />
+          </Field>
         </div>
-      </Field>
-      <Field label="Notes (optional)" span2>
-        <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional info..." />
-      </Field>
+      </Group>
+
+      <Group title="Assignment">
+        <div className={GRID}>
+          <Field label="Business unit" flag={flags.has('business_unit')}>
+            <Sel value={form.business_unit} onChange={v => set('business_unit', v)} options={BUS} placeholder="Select BU" />
+          </Field>
+          <Field label="Submitted by" flag={flags.has('submitted_by')}>
+            <input className="input" value={form.submitted_by} aria-label="Submitted by"
+              onChange={e => set('submitted_by', e.target.value)} placeholder="Name" />
+          </Field>
+        </div>
+      </Group>
+
+      <Group title="Trip">
+        <div className={GRID}>
+          <Field label="Trip / route details" span2 flag={flags.has('purpose')}>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500 pointer-events-none" strokeWidth={2} />
+              <input className="input pl-9" value={form.purpose} aria-label="Trip or route details"
+                onChange={e => set('purpose', e.target.value)}
+                placeholder="Abu Dhabi Airport, HUSKY air shipment collection" />
+            </div>
+          </Field>
+          <Field label="Notes" span2 hint="Optional">
+            <textarea className="textarea resize-none" rows={2} value={form.notes} aria-label="Notes"
+              onChange={e => set('notes', e.target.value)} placeholder="Anything else worth recording" />
+          </Field>
+        </div>
+      </Group>
     </div>
   );
 }
@@ -218,7 +279,7 @@ function AdnocForm({ form, set, rates }) {
 function ShippingForm({
   form, set, charges, setCharges, bls, onBls, containers, onContainers,
   savingsOldFee, onSavingsOldFee, savingsPrevAgent, onSavingsPrevAgent,
-  recordSaving, onRecordSaving
+  recordSaving, onRecordSaving, flags = EMPTY_FLAGS
 }) {
   const total = charges.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0);
   const updateCharge = (i, field, val) => setCharges(ch => ch.map((c, idx) => idx === i ? { ...c, [field]: val } : c));
@@ -228,171 +289,255 @@ function ShippingForm({
   const saving = oldFeeNum > 0 && total > 0 ? oldFeeNum - total : null;
 
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Shipping Line / Agent">
-          <input className="input" value={form.vendor_name} onChange={e => set('vendor_name', e.target.value)} placeholder="e.g. MSC, Maersk, Al Gharbeya" />
-        </Field>
-        <Field label="Invoice / Reference No.">
-          <input className="input" value={form.invoice_number} onChange={e => set('invoice_number', e.target.value)} placeholder="INV-12345" />
-        </Field>
-        <Field label="BL Numbers (Bill of Lading)" span2>
-          <ChipInput chips={bls} onChange={onBls} placeholder="Type BL number, press Enter to add..." />
-        </Field>
-        <Field label="Container Numbers" span2>
-          <ChipInput chips={containers} onChange={onContainers} placeholder="Type container number, press Enter to add..." />
-        </Field>
-        <Field label="Port">
-          <Sel value={form.port} onChange={v => set('port', v)} options={PORTS} placeholder="Select port" />
-        </Field>
-        <Field label="Import / Export">
-          <Sel value={form.shipment_type} onChange={v => set('shipment_type', v)} options={['Import', 'Export']} />
-        </Field>
-        <Field label="Date">
-          <input className="input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
-        </Field>
-        <Field label="Business Unit">
-          <Sel value={form.business_unit} onChange={v => set('business_unit', v)} options={BUS} placeholder="Select BU" />
-        </Field>
-        <Field label="Submitted By" span2>
-          <input className="input" value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} placeholder="Name" />
-        </Field>
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-700">Charge Breakdown</h3>
-          <p className="text-xs text-gray-400">Leave blank if not applicable</p>
+    <div className="space-y-6">
+      <Group title="Shipment">
+        <div className={GRID}>
+          <Field label="Shipping line / agent" flag={flags.has('vendor_name')}>
+            <input className="input" value={form.vendor_name} aria-label="Shipping line or agent"
+              onChange={e => set('vendor_name', e.target.value)} placeholder="MSC, Maersk, Al Gharbeya" />
+          </Field>
+          <Field label="Invoice / reference no." flag={flags.has('invoice_number')}>
+            <input className="input font-mono" value={form.invoice_number} aria-label="Invoice or reference number"
+              onChange={e => set('invoice_number', e.target.value)} placeholder="INV-12345" />
+          </Field>
+          <Field label="BL numbers" span2 flag={flags.has('bl_numbers') || flags.has('bl_number')}>
+            <ChipInput chips={bls} onChange={onBls} label="Bill of lading number"
+              placeholder="Type a BL number, press Enter" />
+          </Field>
+          <Field label="Container numbers" span2 flag={flags.has('container_numbers') || flags.has('container_number')}>
+            <ChipInput chips={containers} onChange={onContainers} label="Container number"
+              placeholder="Type a container number, press Enter" />
+          </Field>
+          <Field label="Port" flag={flags.has('port')}>
+            <Sel value={form.port} onChange={v => set('port', v)} options={PORTS} placeholder="Select port" mono />
+          </Field>
+          <Field label="Import / export" flag={flags.has('shipment_type')}>
+            <Sel value={form.shipment_type} onChange={v => set('shipment_type', v)} options={['Import', 'Export']} />
+          </Field>
+          <Field label="Date" flag={flags.has('date')}>
+            <input className="input font-mono" type="date" aria-label="Date" value={form.date} onChange={e => set('date', e.target.value)} />
+          </Field>
+          <Field label="Business unit" flag={flags.has('business_unit')}>
+            <Sel value={form.business_unit} onChange={v => set('business_unit', v)} options={BUS} placeholder="Select BU" />
+          </Field>
+          <Field label="Submitted by" span2 flag={flags.has('submitted_by')}>
+            <input className="input" value={form.submitted_by} aria-label="Submitted by"
+              onChange={e => set('submitted_by', e.target.value)} placeholder="Name" />
+          </Field>
         </div>
-        <div className="border border-gray-100 rounded-xl overflow-hidden">
-          <div className="grid grid-cols-5 gap-3 px-4 py-2 bg-gray-50 border-b border-gray-100">
-            <span className="col-span-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Charge Type</span>
-            <span className="col-span-2 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Amount (AED)</span>
-          </div>
-          <div className="divide-y divide-gray-50">
+      </Group>
+
+      <Group title="Charge breakdown" note="Leave blank if not applicable">
+        {flags.has('line_items') && (
+          <p className="mb-3 border-l-2 border-flare-500 pl-3 text-sm text-flare-700">
+            The extracted charges did not add up to the invoice total. Check each line.
+          </p>
+        )}
+        <div className="overflow-x-auto border-2 border-ink-900">
+          <div className="min-w-[20rem]">
+            <div className="grid grid-cols-5 gap-3 px-3 py-2 bg-ink-900">
+              <span className="col-span-3 text-2xs font-bold uppercase text-paper-100">Charge type</span>
+              <span className="col-span-2 text-2xs font-bold uppercase text-paper-100 text-right">Amount (AED)</span>
+            </div>
             {charges.map((c, i) => (
-              <div key={i} className="grid grid-cols-5 gap-3 px-4 py-2.5 items-center hover:bg-gray-50/50">
+              <div key={i} className="grid grid-cols-5 gap-3 px-3 py-2 items-center border-b border-paper-300 bg-white">
                 <div className="col-span-3">
                   {c.custom ? (
-                    <input className="input text-sm py-1.5" value={c.label}
-                      onChange={e => updateCharge(i, 'label', e.target.value)} placeholder="Charge name..." />
+                    <input className="input py-1.5" value={c.label} aria-label="Charge name"
+                      onChange={e => updateCharge(i, 'label', e.target.value)} placeholder="Charge name" />
                   ) : (
-                    <span className="text-sm text-gray-700">{c.label}</span>
+                    <span className="text-sm text-ink-900">{c.label}</span>
                   )}
                 </div>
                 <div className="col-span-2 flex items-center gap-2">
-                  <input className="input text-sm py-1.5 text-right" type="number" step="0.01" min="0"
+                  <input className="input py-1.5 text-right font-mono" type="number" step="0.01" min="0"
+                    aria-label={`${c.label || 'Charge'} amount`}
                     value={c.amount} onChange={e => updateCharge(i, 'amount', e.target.value)} placeholder="0.00" />
                   {c.custom && (
-                    <button onClick={() => removeCharge(i)} className="text-gray-300 hover:text-red-400 flex-shrink-0">
-                      <Trash2 className="w-3.5 h-3.5" />
+                    <button type="button" onClick={() => removeCharge(i)} aria-label="Remove charge"
+                      className="text-ink-500 hover:text-flare-700 flex-shrink-0 transition-colors duration-[120ms]">
+                      <Trash2 className="w-4 h-4" strokeWidth={2} />
                     </button>
                   )}
                 </div>
               </div>
             ))}
-          </div>
-          <div className="grid grid-cols-5 gap-3 px-4 py-3 bg-brand-50 border-t border-brand-100">
-            <span className="col-span-3 text-sm font-bold text-brand-700">Total</span>
-            <span className="col-span-2 text-sm font-bold text-brand-700 text-right">AED {fmt(total)}</span>
-          </div>
-        </div>
-        <button onClick={addCustom} className="mt-2 flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium">
-          <Plus className="w-3.5 h-3.5" /> Add custom charge
-        </button>
-      </div>
-
-      <div className={`rounded-xl border p-4 ${recordSaving ? 'border-green-200 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <PiggyBank className={`w-4 h-4 ${recordSaving ? 'text-green-600' : 'text-gray-400'}`} />
-            <span className={`text-sm font-semibold ${recordSaving ? 'text-green-800' : 'text-gray-500'}`}>Clearance Savings</span>
-          </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <span className="text-xs text-gray-500">Record saving</span>
-            <div onClick={() => onRecordSaving(!recordSaving)}
-              className={`w-9 h-5 rounded-full transition-colors relative cursor-pointer ${recordSaving ? 'bg-green-500' : 'bg-gray-300'}`}>
-              <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${recordSaving ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            <div className="grid grid-cols-5 gap-3 px-3 py-2.5 bg-ink-900">
+              <span className="col-span-3 text-sm font-bold text-paper-100">Total</span>
+              <span className="col-span-2 font-mono text-sm text-paper-100 text-right">AED {fmt(total)}</span>
             </div>
-          </label>
+          </div>
         </div>
-        {recordSaving && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="bg-white rounded-lg p-2.5 border border-green-100">
-                <p className="text-xs text-gray-400 mb-0.5">Previous fee</p>
-                <p className="text-sm font-bold text-gray-700">{oldFeeNum > 0 ? `AED ${fmt(oldFeeNum)}` : <span className="text-gray-300 font-normal">—</span>}</p>
+        <button type="button" onClick={addCustom} className="btn-quiet btn-sm mt-3">
+          <Plus className="w-3.5 h-3.5" strokeWidth={2.5} /> Add custom charge
+        </button>
+      </Group>
+
+      <Group title="Clearance savings">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <PiggyBank className={`w-4 h-4 ${recordSaving ? 'text-green-700' : 'text-ink-500'}`} strokeWidth={2} />
+            <span className="text-sm font-bold text-ink-900">Track what this shipment saved</span>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={recordSaving}
+            aria-label="Record saving"
+            onClick={() => onRecordSaving(!recordSaving)}
+            className={`flex items-center gap-2 border-2 border-ink-900 px-1 py-1 transition-colors duration-[120ms] ${recordSaving ? 'bg-green-500' : 'bg-white'}`}
+          >
+            <span className={`w-4 h-4 ${recordSaving ? 'bg-ink-900 order-2' : 'bg-ink-200 order-1'}`} />
+            <span className={`text-xs font-bold uppercase text-ink-900 ${recordSaving ? 'order-1 pl-1' : 'order-2 pr-1'}`}>
+              {recordSaving ? 'On' : 'Off'}
+            </span>
+          </button>
+        </div>
+
+        {recordSaving ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="plate-sub p-3">
+                <p className="label mb-1">Previous fee</p>
+                <p className="font-mono text-sm text-ink-900">{oldFeeNum > 0 ? `AED ${fmt(oldFeeNum)}` : <span className="text-ink-400">--</span>}</p>
               </div>
-              <div className="bg-white rounded-lg p-2.5 border border-green-100">
-                <p className="text-xs text-gray-400 mb-0.5">You paid</p>
-                <p className="text-sm font-bold text-gray-700">{total > 0 ? `AED ${fmt(total)}` : <span className="text-gray-300 font-normal">—</span>}</p>
+              <div className="plate-sub p-3">
+                <p className="label mb-1">You paid</p>
+                <p className="font-mono text-sm text-ink-900">{total > 0 ? `AED ${fmt(total)}` : <span className="text-ink-400">--</span>}</p>
               </div>
-              <div className={`rounded-lg p-2.5 border ${saving !== null && saving > 0 ? 'bg-green-100 border-green-200' : saving !== null && saving < 0 ? 'bg-red-50 border-red-100' : 'bg-white border-green-100'}`}>
-                <p className="text-xs text-gray-400 mb-0.5">Saving</p>
-                <p className={`text-sm font-bold ${saving !== null && saving > 0 ? 'text-green-700' : saving !== null && saving < 0 ? 'text-red-600' : 'text-gray-300'}`}>
-                  {saving !== null ? `AED ${fmt(saving)}` : '—'}
+              <div className={`p-3 border-2 ${saving !== null && saving > 0 ? 'border-green-700 bg-green-50' : saving !== null && saving < 0 ? 'border-flare-700 bg-flare-50' : 'border-paper-400 bg-white'}`}>
+                <p className="label mb-1">Saving</p>
+                <p className={`font-mono text-sm ${saving !== null && saving > 0 ? 'text-green-700' : saving !== null && saving < 0 ? 'text-flare-700' : 'text-ink-400'}`}>
+                  {saving !== null ? `AED ${fmt(saving)}` : '--'}
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label text-xs">Previous agent fee (AED)</label>
-                <input className="input text-sm" type="number" step="0.01" min="0" value={savingsOldFee}
-                  onChange={e => onSavingsOldFee(e.target.value)} placeholder="e.g. 225" />
-              </div>
-              <div>
-                <label className="label text-xs">Previous agent name (optional)</label>
-                <input className="input text-sm" value={savingsPrevAgent}
-                  onChange={e => onSavingsPrevAgent(e.target.value)} placeholder="e.g. Al Gharbeya" />
-              </div>
+            <div className={GRID}>
+              <Field label="Previous agent fee (AED)">
+                <input className="input font-mono text-right" type="number" step="0.01" min="0" value={savingsOldFee}
+                  aria-label="Previous agent fee in AED"
+                  onChange={e => onSavingsOldFee(e.target.value)} placeholder="225" />
+              </Field>
+              <Field label="Previous agent name" hint="Optional">
+                <input className="input" value={savingsPrevAgent} aria-label="Previous agent name"
+                  onChange={e => onSavingsPrevAgent(e.target.value)} placeholder="Al Gharbeya" />
+              </Field>
             </div>
           </div>
+        ) : (
+          <p className="text-sm text-ink-500">Turn this on to record how much this shipment saved against the previous agent.</p>
         )}
-        {!recordSaving && <p className="text-xs text-gray-400">Turn on to track how much you saved vs. the previous agent</p>}
-      </div>
+      </Group>
 
-      <Field label="Notes (optional)">
-        <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional info..." />
-      </Field>
+      <Group title="Notes">
+        <textarea className="textarea resize-none" rows={2} value={form.notes} aria-label="Notes"
+          onChange={e => set('notes', e.target.value)} placeholder="Anything else worth recording" />
+      </Group>
     </div>
   );
 }
 
 // ─── General Form ─────────────────────────────────────────────────────────────
-function GeneralForm({ form, set, rates }) {
+function GeneralForm({ form, set, rates, flags = EMPTY_FLAGS }) {
   return (
-    <div className="grid grid-cols-2 gap-4">
-      <Field label="Vendor / Shop Name">
-        <input className="input" value={form.vendor_name} onChange={e => set('vendor_name', e.target.value)} placeholder="e.g. Carrefour, Dubai Parking" />
-      </Field>
-      <Field label="Invoice Number">
-        <input className="input" value={form.invoice_number} onChange={e => set('invoice_number', e.target.value)} placeholder="Receipt #" />
-      </Field>
-      <Field label="Amount">
-        <CurrencyAmount amount={form.amount} currency={form.currency}
-          onAmount={v => set('amount', v)} onCurrency={v => set('currency', v)} rates={rates} />
-      </Field>
-      <Field label="Date">
-        <input className="input" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
-      </Field>
-      <Field label="Category">
-        <Sel value={form.category} onChange={v => set('category', v)} options={CATEGORIES} placeholder="Select category" />
-      </Field>
-      <Field label="Business Unit">
-        <Sel value={form.business_unit} onChange={v => set('business_unit', v)} options={BUS} placeholder="Select BU" />
-      </Field>
-      <Field label="Payment Method">
-        <Sel value={form.payment_method} onChange={v => set('payment_method', v)} options={['Cash', 'Card']} />
-      </Field>
-      <Field label="Submitted By">
-        <input className="input" value={form.submitted_by} onChange={e => set('submitted_by', e.target.value)} placeholder="Name" />
-      </Field>
-      <Field label="Purpose" span2>
-        <input className="input" value={form.purpose} onChange={e => set('purpose', e.target.value)} placeholder="e.g. Parking at Sky Cargo" />
-      </Field>
-      <Field label="Notes (optional)" span2>
-        <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any additional info..." />
-      </Field>
+    <div className="space-y-6">
+      <Group title="Receipt">
+        <div className={GRID}>
+          <Field label="Vendor / shop name" flag={flags.has('vendor_name')}>
+            <input className="input" value={form.vendor_name} aria-label="Vendor or shop name"
+              onChange={e => set('vendor_name', e.target.value)} placeholder="Carrefour, Dubai Parking" />
+          </Field>
+          <Field label="Invoice number" flag={flags.has('invoice_number')}>
+            <input className="input font-mono" value={form.invoice_number} aria-label="Invoice number"
+              onChange={e => set('invoice_number', e.target.value)} placeholder="Receipt no." />
+          </Field>
+          <Field label="Amount" flag={flags.has('amount') || flags.has('currency')}>
+            <CurrencyAmount amount={form.amount} currency={form.currency}
+              onAmount={v => set('amount', v)} onCurrency={v => set('currency', v)} rates={rates} />
+          </Field>
+          <Field label="Date" flag={flags.has('date')}>
+            <input className="input font-mono" type="date" aria-label="Date" value={form.date} onChange={e => set('date', e.target.value)} />
+          </Field>
+        </div>
+      </Group>
+
+      <Group title="Classification">
+        <div className={GRID}>
+          <Field label="Category" flag={flags.has('category')}>
+            <Sel value={form.category} onChange={v => set('category', v)} options={CATEGORIES} placeholder="Select category" />
+          </Field>
+          <Field label="Business unit" flag={flags.has('business_unit')}>
+            <Sel value={form.business_unit} onChange={v => set('business_unit', v)} options={BUS} placeholder="Select BU" />
+          </Field>
+          <Field label="Payment method" flag={flags.has('payment_method')}>
+            <Sel value={form.payment_method} onChange={v => set('payment_method', v)} options={['Cash', 'Card']} />
+          </Field>
+          <Field label="Submitted by" flag={flags.has('submitted_by')}>
+            <input className="input" value={form.submitted_by} aria-label="Submitted by"
+              onChange={e => set('submitted_by', e.target.value)} placeholder="Name" />
+          </Field>
+        </div>
+      </Group>
+
+      <Group title="Detail">
+        <div className={GRID}>
+          <Field label="Purpose" span2 flag={flags.has('purpose')}>
+            <input className="input" value={form.purpose} aria-label="Purpose"
+              onChange={e => set('purpose', e.target.value)} placeholder="Parking at Sky Cargo" />
+          </Field>
+          <Field label="Notes" span2 hint="Optional">
+            <textarea className="textarea resize-none" rows={2} value={form.notes} aria-label="Notes"
+              onChange={e => set('notes', e.target.value)} placeholder="Anything else worth recording" />
+          </Field>
+        </div>
+      </Group>
+    </div>
+  );
+}
+
+// ─── Extraction states ────────────────────────────────────────────────────────
+/* Two inks crossing: the mark that says the plates are being pulled. */
+function OverprintMark({ size = 'w-6 h-6' }) {
+  return (
+    <span className={`relative block ${size} flex-shrink-0`} aria-hidden="true">
+      <span className="absolute left-0 top-0 w-4 h-4 bg-blue-600 overprint" />
+      <span className="absolute right-0 bottom-0 w-4 h-4 bg-flare-500 overprint animate-pulse" />
+    </span>
+  );
+}
+
+const SKELETON_ROWS = ['w-3/4', 'w-1/2', 'w-2/3', 'w-1/3', 'w-5/6', 'w-1/2'];
+
+function ExtractionPanel({ fileName, progress }) {
+  return (
+    <div className="plate p-4 sm:p-5 animate-fade-in">
+      <div className="flex items-center gap-3 border-b-2 border-ink-900 pb-3 mb-4">
+        <OverprintMark />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-ink-900">Reading the document</p>
+          <p className="meta truncate">{fileName}</p>
+        </div>
+        <span className="font-mono text-sm text-ink-900 tabular-nums">{Math.round(progress)}%</span>
+      </div>
+
+      <div className="h-3 border-2 border-ink-900 bg-white mb-5">
+        <div className="h-full bg-blue-600 transition-[width] duration-[120ms] ease-out" style={{ width: `${progress}%` }} />
+      </div>
+
+      <p className="label">Fields being pulled</p>
+      <div className="border-t border-paper-300">
+        {SKELETON_ROWS.map((w, i) => (
+          <div key={i} className="flex items-center gap-4 py-3 border-b border-paper-300">
+            <div className="skeleton h-2.5 w-20 flex-shrink-0" />
+            <div className={`skeleton h-3.5 ${w}`} />
+          </div>
+        ))}
+      </div>
+
+      <p className="text-sm text-ink-500 mt-4">
+        The vendor, amount, date and reference numbers are read straight off the page. Anything read with low
+        confidence is marked in orange for you to check.
+      </p>
     </div>
   );
 }
@@ -414,6 +559,14 @@ export default function UploadPage() {
   const [error, setError] = useState('');
   const [stage, setStage] = useState('idle');
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Extraction review signals from the backend validator
+  const [flags, setFlags] = useState(EMPTY_FLAGS);
+  const [needsReview, setNeedsReview] = useState(false);
+  const [reviewNotes, setReviewNotes] = useState('');
+  // SHA-256 of the uploaded file, returned by /api/upload. Carried through to
+  // the save so the server's exact-file duplicate check has something to match.
+  const [fileHash, setFileHash] = useState('');
 
   const [rates, setRates] = useState({ AED: 1, USD: 3.6725, EUR: 4.02, GBP: 4.68, SAR: 0.98, QAR: 1.01, KWD: 11.96, OMR: 9.53 });
 
@@ -476,6 +629,10 @@ export default function UploadPage() {
     setUploading(true);
     setUploadProgress(2);
     setFileName(file.name);
+    setFlags(EMPTY_FLAGS);
+    setNeedsReview(false);
+    setReviewNotes('');
+    setFileHash('');
 
     clearInterval(progressRef.current);
     progressRef.current = setInterval(() => {
@@ -491,6 +648,11 @@ export default function UploadPage() {
       const result = await api.uploadBill(file, selectedType.slug);
       const p = result.parsed || {};
       if (result.parseError) setError(`Scan failed: ${result.parseError}`);
+
+      setFlags(new Set(Array.isArray(p.low_confidence_fields) ? p.low_confidence_fields : []));
+      setNeedsReview(!!p.needs_review);
+      setReviewNotes(p.review_notes || '');
+      setFileHash(result.file_hash || '');
 
       if (selectedType.slug === 'adnoc') {
         const adnocExtra = [
@@ -640,6 +802,16 @@ export default function UploadPage() {
     if (!payload.expense_type) payload.expense_type = selectedType.slug;
     if (!payload.expense_type_id) payload.expense_type_id = selectedType.id;
 
+    // Provenance from the scan. Without these the server's exact-file duplicate
+    // check never fires (file_hash is always null) and the AI's own confidence
+    // assessment is discarded, leaving needs_review false on every expense.
+    // A typed-in entry has no scan behind it, so only send them when there was one.
+    if (fileHash) payload.file_hash = fileHash;
+    if (needsReview) {
+      payload.needs_review = true;
+      payload.review_notes = reviewNotes || null;
+    }
+
     setSaving(true);
     try {
       await api.createRecord(payload);
@@ -653,6 +825,10 @@ export default function UploadPage() {
     }
   };
 
+  const clearReview = () => {
+    setFlags(EMPTY_FLAGS); setNeedsReview(false); setReviewNotes('');
+  };
+
   const reset = () => {
     setSelectedType(null); setInputMode('upload'); setPreview(null); setFileName('');
     setStage('idle'); setError('');
@@ -661,10 +837,12 @@ export default function UploadPage() {
     setShippingBLs([]); setShippingContainers([]);
     setSavingsOldFee(''); setSavingsPrevAgent(''); setRecordSaving(true);
     setCustomForm({});
+    clearReview();
   };
 
   const clearUpload = () => {
     setPreview(null); setStage('idle'); setFileName(''); setError('');
+    clearReview();
     if (selectedType?.slug === 'adnoc') setAdnocForm(EMPTY_ADNOC);
     else if (selectedType?.slug === 'shipping') {
       setShippingForm(EMPTY_SHIPPING); setShippingBLs([]); setShippingContainers([]);
@@ -677,29 +855,26 @@ export default function UploadPage() {
   // ── Type Selection Screen ────────────────────────────────────────────────────
   if (!selectedType) {
     return (
-      <div className="p-6 max-w-3xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Add Expense</h1>
-          <p className="text-sm text-gray-500 mt-1">Select the type of expense to add</p>
+      <div className="p-4 sm:p-6 max-w-3xl mx-auto">
+        <div className="mb-7">
+          <h1 className="text-3xl w-wider text-ink-900">Add expense</h1>
+          <p className="text-sm text-ink-500 mt-1">Pick the kind of receipt you are recording</p>
         </div>
 
         {typesLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[1,2,3].map(i => (
-              <div key={i} className="card p-6 animate-pulse">
-                <div className="w-12 h-12 bg-gray-200 rounded-2xl mb-4" />
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                <div className="h-3 bg-gray-100 rounded w-full" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="plate p-5">
+                <div className="skeleton w-12 h-12 mb-4" />
+                <div className="skeleton h-4 w-3/4 mb-2" />
+                <div className="skeleton h-3 w-full" />
               </div>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {expenseTypes.map(type => {
               const IconComp = ICON_MAP[type.icon] || Receipt;
-              const style = { color: type.color };
-              const bgStyle = { backgroundColor: type.color + '1a' };
-              const hoverBgStyle = { backgroundColor: type.color + '33' };
               return (
                 <button
                   key={type.id}
@@ -717,17 +892,16 @@ export default function UploadPage() {
                       setCustomForm(defaults);
                     }
                   }}
-                  className="group card p-6 text-left hover:shadow-card-hover transition-all duration-200"
-                  style={{ '--hover-border': type.color }}
+                  className="plate p-5 text-left hover:bg-paper-50 transition-colors duration-[120ms]"
                 >
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-colors"
-                    style={bgStyle}>
-                    <IconComp className="w-6 h-6" style={style} />
+                  <div className={`w-12 h-12 flex items-center justify-center mb-4 ${type.is_builtin ? 'bg-ink-900' : 'border-2 border-ink-900 bg-white'}`}>
+                    <IconComp className="w-6 h-6" strokeWidth={2}
+                      style={{ color: type.is_builtin ? '#EDECE8' : type.color }} />
                   </div>
-                  <h3 className="font-bold text-gray-900 mb-1">{type.name}</h3>
-                  <p className="text-xs text-gray-500 leading-relaxed">{type.description}</p>
+                  <h2 className="text-lg w-wide text-ink-900">{type.name}</h2>
+                  <p className="text-sm text-ink-500 mt-1">{type.description}</p>
                   {!type.is_builtin && (
-                    <span className="inline-block mt-2 px-2 py-0.5 bg-brand-50 border border-brand-100 text-brand-600 text-[10px] font-medium rounded-full">Custom</span>
+                    <span className="tag-blue mt-3">Custom</span>
                   )}
                 </button>
               );
@@ -740,145 +914,175 @@ export default function UploadPage() {
 
   // ── Form Screen ──────────────────────────────────────────────────────────────
   const IconComp = ICON_MAP[selectedType.icon] || Receipt;
-  const typeColor = selectedType.color;
+  const twoUp = inputMode === 'upload' && stage === 'extracted';
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={reset} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500">
-          <ArrowLeft className="w-4 h-4" />
+        <button onClick={reset} aria-label="Back to expense types"
+          className="w-9 h-9 border-2 border-ink-900 bg-white flex items-center justify-center text-ink-900 hover:bg-paper-100 transition-colors duration-[120ms] flex-shrink-0">
+          <ArrowLeft className="w-4 h-4" strokeWidth={2.5} />
         </button>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: typeColor + '1a' }}>
-          <IconComp className="w-4 h-4" style={{ color: typeColor }} />
+        <div className={`w-9 h-9 flex items-center justify-center flex-shrink-0 ${selectedType.is_builtin ? 'bg-ink-900' : 'border-2 border-ink-900 bg-white'}`}>
+          <IconComp className="w-[18px] h-[18px]" strokeWidth={2}
+            style={{ color: selectedType.is_builtin ? '#EDECE8' : selectedType.color }} />
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">{selectedType.name}</h1>
-          <p className="text-xs text-gray-400">Fill in details or upload a bill to auto-extract</p>
+        <div className="min-w-0">
+          <h1 className="text-2xl w-wider text-ink-900 truncate">{selectedType.name}</h1>
+          <p className="text-sm text-ink-500">Upload the bill to auto-fill, or type it in</p>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-sm text-red-600">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}
+        <div className="mb-5 border-2 border-flare-700 bg-flare-50 px-4 py-3 flex items-start gap-3 text-sm text-flare-700">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" strokeWidth={2.5} /> {error}
         </div>
       )}
 
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit mb-5">
+      <div className="inline-flex border-2 border-ink-900 mb-6">
         <button onClick={() => setInputMode('upload')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${inputMode === 'upload' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-          <Scan className="w-4 h-4" /> Upload & Scan
+          aria-pressed={inputMode === 'upload'}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-bold transition-colors duration-[120ms]
+            ${inputMode === 'upload' ? 'bg-blue-600 text-white' : 'bg-white text-ink-900 hover:bg-paper-100'}`}>
+          <Scan className="w-4 h-4" strokeWidth={2.5} /> Upload and scan
         </button>
         <button onClick={() => setInputMode('manual')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${inputMode === 'manual' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-          <PenLine className="w-4 h-4" /> Manual Entry
+          aria-pressed={inputMode === 'manual'}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-l-2 border-ink-900 transition-colors duration-[120ms]
+            ${inputMode === 'manual' ? 'bg-blue-600 text-white' : 'bg-white text-ink-900 hover:bg-paper-100'}`}>
+          <PenLine className="w-4 h-4" strokeWidth={2.5} /> Type it in
         </button>
       </div>
 
-      <div className={`grid ${inputMode === 'upload' && stage === 'extracted' ? 'grid-cols-5' : 'grid-cols-1'} gap-6`}>
+      <div className={`grid gap-5 ${twoUp ? 'grid-cols-1 lg:grid-cols-5' : 'grid-cols-1'}`}>
         {inputMode === 'upload' && (
-          <div className={stage === 'extracted' ? 'col-span-2' : 'col-span-1'}>
+          <div className={twoUp ? 'lg:col-span-2' : ''}>
             {!preview ? (
               <div
                 onClick={() => fileRef.current?.click()}
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
-                className={`card border-2 border-dashed cursor-pointer transition-all flex flex-col items-center justify-center p-12 min-h-56
-                  ${dragOver ? 'border-brand-500 bg-brand-50 scale-[1.01]' : 'border-gray-200 hover:border-brand-300 hover:bg-brand-50/40'}`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileRef.current?.click(); } }}
+                className={`relative border-2 cursor-pointer transition-colors duration-[120ms] flex flex-col items-center justify-center text-center px-6 py-12 min-h-[17rem]
+                  ${dragOver ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-ink-900 text-ink-900 hover:bg-paper-50'}`}
               >
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${dragOver ? 'bg-brand-100' : 'bg-gray-100'}`}>
-                  {uploading
-                    ? <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-                    : <Upload className={`w-6 h-6 ${dragOver ? 'text-brand-600' : 'text-gray-400'}`} />
-                  }
+                <span className={`absolute inset-2 border pointer-events-none ${dragOver ? 'border-white/40' : 'border-paper-400'}`} aria-hidden="true" />
+                <div className={`w-16 h-16 border-2 flex items-center justify-center mb-4 ${dragOver ? 'border-white' : 'border-ink-900'}`}>
+                  <Upload className="w-7 h-7" strokeWidth={2} />
                 </div>
-                <p className="text-sm font-semibold text-gray-700 mb-1">
-                  {uploading ? 'Scanning document...' : 'Drop your bill here'}
+                <p className="text-xl w-wide font-bold">{dragOver ? 'Release to scan' : 'Drop the receipt here'}</p>
+                <p className={`text-sm mt-1 ${dragOver ? 'text-white/80' : 'text-ink-500'}`}>or click to browse</p>
+                <p className={`font-mono text-xs mt-4 ${dragOver ? 'text-white/70' : 'text-ink-400'}`}>
+                  JPG · PNG · WEBP · PDF · up to 15 MB
                 </p>
-                <p className="text-xs text-gray-400 text-center">or click to browse · JPG, PNG, PDF up to 15MB</p>
                 <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden"
                   onChange={e => e.target.files[0] && handleFile(e.target.files[0])} />
               </div>
             ) : (
-              <div className="card overflow-hidden">
-                <div className="relative">
-                  {preview === 'pdf' ? (
-                    <div className="flex flex-col items-center justify-center py-10 bg-gray-50">
-                      <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mb-2">
-                        <FileText className="w-6 h-6 text-red-500" />
-                      </div>
-                      <p className="text-sm font-medium text-gray-700 truncate max-w-xs px-4 text-center">{fileName}</p>
-                      <p className="text-xs text-gray-400 mt-1">{uploading ? 'Reading document...' : 'Document uploaded'}</p>
-                    </div>
-                  ) : (
-                    <img src={preview} alt="Bill" className="w-full object-contain max-h-72" />
-                  )}
+              <div className="plate">
+                <div className="flex items-center gap-2 px-3 py-2 border-b-2 border-ink-900">
+                  <FileText className="w-4 h-4 text-ink-900 flex-shrink-0" strokeWidth={2} />
+                  <p className="font-mono text-xs text-ink-900 truncate flex-1">{fileName}</p>
                   {!uploading && (
-                    <button onClick={clearUpload}
-                      className="absolute top-2 right-2 w-7 h-7 bg-white rounded-full shadow flex items-center justify-center hover:bg-red-50">
-                      <X className="w-4 h-4 text-gray-500" />
+                    <button onClick={clearUpload} aria-label="Remove file"
+                      className="w-6 h-6 border border-paper-400 flex items-center justify-center text-ink-500 hover:border-flare-700 hover:text-flare-700 transition-colors duration-[120ms] flex-shrink-0">
+                      <X className="w-3.5 h-3.5" strokeWidth={2.5} />
                     </button>
                   )}
-                  {uploading && (
-                    <div className="absolute bottom-0 left-0 right-0">
-                      <div className="h-1 bg-gray-200">
-                        <div className="h-full bg-brand-500 transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }} />
-                      </div>
-                    </div>
-                  )}
                 </div>
+
+                {preview === 'pdf' ? (
+                  <div className="flex flex-col items-center justify-center py-12 bg-paper-50">
+                    <div className="w-14 h-14 border-2 border-ink-900 bg-white flex items-center justify-center mb-3">
+                      <FileText className="w-6 h-6 text-ink-900" strokeWidth={2} />
+                    </div>
+                    <p className="text-sm text-ink-500">{uploading ? 'Reading the document' : 'Document uploaded'}</p>
+                  </div>
+                ) : (
+                  <img src={resolveAsset(preview)} alt="Uploaded receipt" className="w-full object-contain max-h-80 bg-paper-50" />
+                )}
+
                 {uploading && (
-                  <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex items-center gap-3">
-                    <div className="w-3.5 h-3.5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                    <span className="text-xs text-gray-500 font-medium">Extracting details from your bill...</span>
-                    <span className="ml-auto text-xs text-gray-400">{Math.round(uploadProgress)}%</span>
+                  <div className="border-t-2 border-ink-900">
+                    <div className="h-2 bg-paper-300">
+                      <div className="h-full bg-blue-600 transition-[width] duration-[120ms] ease-out" style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                    <div className="px-3 py-2 flex items-center gap-3">
+                      <OverprintMark size="w-5 h-5" />
+                      <span className="text-sm text-ink-700 flex-1">Extracting details</span>
+                      <span className="font-mono text-xs text-ink-500 tabular-nums">{Math.round(uploadProgress)}%</span>
+                    </div>
                   </div>
                 )}
+
                 {stage === 'extracted' && !uploading && (
-                  <div className="p-3 bg-brand-50 border-t border-brand-100 flex items-center gap-2 text-xs text-brand-700 font-medium">
-                    <CheckCircle className="w-3.5 h-3.5" /> Details extracted — review and save
-                  </div>
+                  needsReview ? (
+                    <div className="border-t-2 border-ink-900 bg-flare-500 px-3 py-2 flex items-center gap-2 text-sm font-bold text-ink-900">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" strokeWidth={2.5} /> Extracted, some fields need checking
+                    </div>
+                  ) : (
+                    <div className="border-t-2 border-ink-900 bg-green-500 px-3 py-2 flex items-center gap-2 text-sm font-bold text-ink-900">
+                      <CheckCircle className="w-4 h-4 flex-shrink-0" strokeWidth={2.5} /> Extracted, review and save
+                    </div>
+                  )
                 )}
               </div>
             )}
           </div>
         )}
 
-        {(inputMode === 'manual' || stage === 'extracted' || inputMode === 'upload') && (
-          <div className={`${inputMode === 'upload' && stage === 'extracted' ? 'col-span-3' : 'col-span-1'} card p-6 fade-in`}>
-            {selectedType.slug === 'adnoc' && (
-              <AdnocForm form={adnocForm} set={(k, v) => setField('adnoc', k, v)} rates={rates} />
-            )}
-            {selectedType.slug === 'shipping' && (
-              <ShippingForm
-                form={shippingForm} set={(k, v) => setField('shipping', k, v)}
-                charges={shippingCharges} setCharges={setShippingCharges}
-                bls={shippingBLs} onBls={setShippingBLs}
-                containers={shippingContainers} onContainers={setShippingContainers}
-                savingsOldFee={savingsOldFee} onSavingsOldFee={setSavingsOldFee}
-                savingsPrevAgent={savingsPrevAgent} onSavingsPrevAgent={setSavingsPrevAgent}
-                recordSaving={recordSaving} onRecordSaving={setRecordSaving}
-              />
-            )}
-            {selectedType.is_builtin && selectedType.slug !== 'adnoc' && selectedType.slug !== 'shipping' && (
-              <GeneralForm form={generalForm} set={(k, v) => setField('general', k, v)} rates={rates} />
-            )}
-            {!selectedType.is_builtin && (
-              <DynamicForm fields={selectedType.fields_schema} values={customForm}
-                onChange={setCustomForm} rates={rates} />
-            )}
+        <div className={twoUp ? 'lg:col-span-3' : ''}>
+          {uploading ? (
+            <ExtractionPanel fileName={fileName} progress={uploadProgress} />
+          ) : (
+            <div className="animate-fade-in">
+              {needsReview && stage === 'extracted' && (
+                <div className="mb-6 border-2 border-flare-500 bg-flare-50 px-4 py-3">
+                  <p className="text-sm font-bold text-flare-700 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" strokeWidth={2.5} /> Check the marked fields before saving
+                  </p>
+                  {reviewNotes && <p className="text-sm text-ink-700 mt-1.5">{reviewNotes}</p>}
+                </div>
+              )}
 
-            <div className="flex gap-3 mt-6 pt-4 border-t border-gray-100">
-              <button onClick={reset} className="btn-secondary">Cancel</button>
-              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                {saving
-                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</>
-                  : 'Save Expense'
-                }
-              </button>
+              {selectedType.slug === 'adnoc' && (
+                <AdnocForm form={adnocForm} set={(k, v) => setField('adnoc', k, v)} rates={rates} flags={flags} />
+              )}
+              {selectedType.slug === 'shipping' && (
+                <ShippingForm
+                  form={shippingForm} set={(k, v) => setField('shipping', k, v)}
+                  charges={shippingCharges} setCharges={setShippingCharges}
+                  bls={shippingBLs} onBls={setShippingBLs}
+                  containers={shippingContainers} onContainers={setShippingContainers}
+                  savingsOldFee={savingsOldFee} onSavingsOldFee={setSavingsOldFee}
+                  savingsPrevAgent={savingsPrevAgent} onSavingsPrevAgent={setSavingsPrevAgent}
+                  recordSaving={recordSaving} onRecordSaving={setRecordSaving}
+                  flags={flags}
+                />
+              )}
+              {selectedType.is_builtin && selectedType.slug !== 'adnoc' && selectedType.slug !== 'shipping' && (
+                <GeneralForm form={generalForm} set={(k, v) => setField('general', k, v)} rates={rates} flags={flags} />
+              )}
+              {!selectedType.is_builtin && (
+                <DynamicForm fields={selectedType.fields_schema} values={customForm}
+                  onChange={setCustomForm} rates={rates} flags={flags} />
+              )}
+
+              <div className="flex flex-wrap gap-3 mt-6 pt-5 border-t-2 border-ink-900">
+                <button onClick={reset} className="btn-ghost">Cancel</button>
+                <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
+                  {saving
+                    ? <><span className="w-2.5 h-2.5 bg-current animate-pulse" /> Saving</>
+                    : 'Save expense'
+                  }
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
