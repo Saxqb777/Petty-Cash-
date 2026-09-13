@@ -30,23 +30,52 @@ const EMPTY_FORM = {
   description: '',
 };
 
+// 120ms, ease-out, opacity + 4px.
 const container = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.07 } }
+  show: { transition: { staggerChildren: 0.04 } }
 };
 const item = {
-  hidden: { opacity: 0, y: 14 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] } }
+  hidden: { opacity: 0, y: 4 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.12, ease: 'easeOut' } }
 };
 
 function Sel({ value, onChange, options, placeholder = 'Select...', className = '' }) {
   return (
     <div className="relative">
-      <select value={value} onChange={e => onChange(e.target.value)} className={`input appearance-none pr-8 cursor-pointer ${className}`}>
+      <select value={value} onChange={e => onChange(e.target.value)} className={`select ${className}`}>
         {placeholder && <option value="">{placeholder}</option>}
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
-      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none" />
+      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500 pointer-events-none" strokeWidth={2} />
+    </div>
+  );
+}
+
+// Flat ink scrim, white plate, 2px rule. Same treatment as Records.
+function Modal({ title, onClose, children, footer, size = 'max-w-2xl' }) {
+  useEffect(() => {
+    const handle = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handle);
+    return () => document.removeEventListener('keydown', handle);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 bg-ink-900/30 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className={`plate w-full ${size} my-auto animate-rise`}>
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b-2 border-ink-900">
+          <h2 className="text-base w-wide text-ink-900">{title}</h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="w-7 h-7 flex items-center justify-center text-ink-500 hover:text-ink-900 hover:bg-paper-200 transition-colors duration-[120ms]"
+          >
+            <X className="w-4 h-4" strokeWidth={2} />
+          </button>
+        </div>
+        <div className="p-4 sm:p-5 max-h-[70vh] overflow-y-auto">{children}</div>
+        {footer && <div className="flex gap-3 px-4 py-3 border-t-2 border-ink-900">{footer}</div>}
+      </div>
     </div>
   );
 }
@@ -124,7 +153,7 @@ function ImportModal({ onClose, onImport }) {
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
         const parsed = parseSheetRows(rows);
         if (!parsed.length) {
-          setError('No valid rows found. Make sure your sheet has a header row with columns like: Date, BU, Port, Previous Agent, Old Fee, New Fee…');
+          setError('No valid rows found. Make sure your sheet has a header row with columns like: Date, BU, Port, Previous Agent, Old Fee, New Fee.');
           setPreview([]);
         } else {
           setPreview(parsed);
@@ -152,91 +181,86 @@ function ImportModal({ onClose, onImport }) {
   const totalSavings = preview.reduce((s, r) => s + (r.savings ?? (r.old_fee - r.new_fee)), 0);
 
   return (
-    <div className="fixed inset-0 bg-ink-900/20 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-modal border border-paper-400 w-full max-w-2xl max-h-[90vh] overflow-auto">
-        <div className="flex items-center justify-between p-5 border-b border-paper-400">
-          <h2 className="font-heading font-bold text-ink-800">Import Savings Data</h2>
-          <button onClick={onClose} className="text-ink-400 hover:text-ink-700"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-5 space-y-4">
-          {/* Upload zone */}
-          <div
-            onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-paper-400 hover:border-brand-400 rounded-lg p-8 text-center cursor-pointer transition-colors hover:bg-brand-50/30"
+    <Modal
+      title="Import Savings Data"
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} className="btn-ghost flex-1">Cancel</button>
+          <button
+            onClick={handleImport}
+            disabled={importing || preview.length === 0}
+            className="btn-primary flex-1"
           >
-            <FileSpreadsheet className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-ink-700">
-              {fileName || 'Upload your savings spreadsheet'}
-            </p>
-            <p className="text-xs text-ink-400 mt-1">Accepts .xlsx, .xls, .csv — any column order</p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={e => e.target.files[0] && processFile(e.target.files[0])}
-            />
-          </div>
+            <Upload className="w-4 h-4" strokeWidth={2} />
+            {importing ? 'Importing...' : `Import ${preview.length} Record${preview.length !== 1 ? 's' : ''}`}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {/* Upload zone */}
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="w-full border-2 border-dashed border-ink-900 p-8 text-center cursor-pointer transition-colors duration-[120ms] hover:bg-blue-50"
+        >
+          <FileSpreadsheet className="w-9 h-9 text-ink-500 mx-auto mb-3" strokeWidth={2} />
+          <p className="text-sm font-bold text-ink-900 break-all">
+            {fileName || 'Upload your savings spreadsheet'}
+          </p>
+          <p className="meta mt-1">Accepts .xlsx, .xls, .csv in any column order</p>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={e => e.target.files[0] && processFile(e.target.files[0])}
+          />
+        </button>
 
-          {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
+        {error && <p className="text-sm text-flare-700 bg-flare-50 border-2 border-flare-700 p-3">{error}</p>}
 
-          {preview.length > 0 && (
-            <>
-              <div className="p-3 bg-brand-50 rounded-lg border border-brand-100 text-sm text-brand-700 flex justify-between items-center">
-                <span><strong>{preview.length} records</strong> ready to import</span>
-                <span className="font-bold">Total savings: AED {fmt(totalSavings)}</span>
-              </div>
+        {preview.length > 0 && (
+          <>
+            <div className="flex flex-wrap justify-between items-center gap-2 p-3 bg-green-500 border-2 border-ink-900 text-ink-900">
+              <span className="text-sm font-bold">{preview.length} records ready to import</span>
+              <span className="font-mono tabular-nums text-sm">AED {fmt(totalSavings)}</span>
+            </div>
 
-              {/* Preview table */}
-              <div className="overflow-x-auto rounded-lg border border-paper-400">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-paper-100 border-b border-paper-400">
-                      {['Date','BU','Port','Prev. Agent','Old Fee','Curr. Agent','New Fee','Savings'].map(h => (
-                        <th key={h} className="text-left px-3 py-2 font-semibold text-ink-500 whitespace-nowrap">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-paper-300">
-                    {preview.slice(0, 8).map((r, i) => (
-                      <tr key={i} className="hover:bg-paper-100">
-                        <td className="px-3 py-1.5 text-ink-600">{r.date}</td>
-                        <td className="px-3 py-1.5 text-ink-600">{r.business_unit || '—'}</td>
-                        <td className="px-3 py-1.5 text-ink-600">{r.port || '—'}</td>
-                        <td className="px-3 py-1.5 text-ink-600">{r.previous_agent || '—'}</td>
-                        <td className="px-3 py-1.5 text-right font-mono text-ink-700">{fmt(r.old_fee)}</td>
-                        <td className="px-3 py-1.5 text-ink-600">{r.current_agent || '—'}</td>
-                        <td className="px-3 py-1.5 text-right font-mono text-ink-700">{fmt(r.new_fee)}</td>
-                        <td className="px-3 py-1.5 text-right font-mono font-bold text-emerald-700">
-                          {fmt(r.savings ?? (r.old_fee - r.new_fee))}
-                        </td>
-                      </tr>
+            {/* Preview table */}
+            <div className="overflow-x-auto">
+              <table className="ledger min-w-[720px]">
+                <thead>
+                  <tr>
+                    {['Date','BU','Port','Prev. Agent','Old Fee','Curr. Agent','New Fee','Savings'].map((h, i) => (
+                      <th key={h} className={i === 4 || i === 6 || i === 7 ? '!text-right' : ''}>{h}</th>
                     ))}
-                  </tbody>
-                </table>
-                {preview.length > 8 && (
-                  <p className="text-xs text-ink-400 text-center py-2">…and {preview.length - 8} more rows</p>
-                )}
-              </div>
-            </>
-          )}
-
-          <div className="flex gap-3">
-            <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-            <button
-              onClick={handleImport}
-              disabled={importing || preview.length === 0}
-              className="btn-primary flex-1 flex items-center justify-center gap-2"
-            >
-              {importing
-                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Importing...</>
-                : <><Upload className="w-4 h-4" /> Import {preview.length} Record{preview.length !== 1 ? 's' : ''}</>
-              }
-            </button>
-          </div>
-        </div>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.slice(0, 8).map((r, i) => (
+                    <tr key={i}>
+                      <td className="font-mono text-xs whitespace-nowrap text-ink-700">{r.date}</td>
+                      <td className="text-ink-700">{r.business_unit || '-'}</td>
+                      <td className="text-ink-700">{r.port || '-'}</td>
+                      <td className="text-ink-700">{r.previous_agent || '-'}</td>
+                      <td className="amount text-ink-700">{fmt(r.old_fee)}</td>
+                      <td className="text-ink-700">{r.current_agent || '-'}</td>
+                      <td className="amount text-ink-700">{fmt(r.new_fee)}</td>
+                      <td className="amount text-green-700">{fmt(r.savings ?? (r.old_fee - r.new_fee))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {preview.length > 8 && (
+              <p className="meta text-center">and {preview.length - 8} more rows</p>
+            )}
+          </>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -387,156 +411,174 @@ export default function SavingsPage() {
     await Promise.all([loadSummary(), loadRecords()]);
   };
 
+  const netPositive = (summary?.net || 0) >= 0;
+  const hasSavingsFilters = filterBU || filterIE || filterFrom || filterTo;
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-        className="flex items-center justify-between mb-7"
+        initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.12, ease: 'easeOut' }}
+        className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5 pb-4 border-b-2 border-ink-900"
       >
         <div>
-          <h1 className="text-2xl font-heading font-bold text-ink-900 tracking-tight">Clearance Savings</h1>
-          <p className="text-sm text-ink-400 mt-0.5 font-medium">Track agent fee savings from self-clearance operations</p>
+          <h1 className="display text-3xl text-ink-900">Clearance Savings</h1>
+          <p className="text-sm text-ink-500 mt-1.5">Track agent fee savings from self-clearance operations</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowCSV(true)} className="btn-secondary flex items-center gap-2 text-sm">
-            <Upload className="w-3.5 h-3.5" /> Import CSV
+          <button onClick={() => setShowCSV(true)} className="btn-ghost btn-sm">
+            <Upload className="w-3.5 h-3.5" strokeWidth={2} /> Import CSV
           </button>
-          <button onClick={() => setTab('add')} className="btn-primary flex items-center gap-2 text-sm">
-            <Plus className="w-4 h-4" /> Add Record
+          <button onClick={() => setTab('add')} className="btn-primary btn-sm">
+            <Plus className="w-4 h-4" strokeWidth={2.5} /> Add Record
           </button>
         </div>
       </motion.div>
 
-      {/* Summary Cards */}
-      <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-3 gap-4 mb-6">
-        <motion.div variants={item} className="card p-5">
-          <p className="text-xs text-brand-600 font-semibold mb-2">GROSS SAVINGS</p>
-          <p className="text-2xl font-bold font-heading text-brand-700">AED {fmt(summary?.gross)}</p>
-          <p className="text-xs text-ink-400 mt-1">Total agent fees saved</p>
+      {/* Summary — one object, three panels, green carries the result */}
+      <motion.div
+        variants={container} initial="hidden" animate="show"
+        className="grid grid-cols-1 sm:grid-cols-3 border-2 border-ink-900 mb-6"
+      >
+        <motion.div variants={item} className="bg-white px-5 py-4">
+          <p className="label">Gross savings</p>
+          <p className="font-mono tabular-nums text-2xl leading-none text-green-700">AED {fmt(summary?.gross)}</p>
+          <p className="meta mt-2">Total agent fees saved</p>
         </motion.div>
-        <motion.div variants={item} className="card p-5">
-          <p className="text-xs text-orange-600 font-semibold mb-2">FUEL COST</p>
-          <p className="text-2xl font-bold font-heading text-orange-700">AED {fmt(summary?.fuelCost)}</p>
-          <p className="text-xs text-ink-400 mt-1">Self-clearance fuel (ADNOC)</p>
+        <motion.div variants={item} className="bg-white px-5 py-4 border-t-2 sm:border-t-0 sm:border-l-2 border-ink-900">
+          <p className="label">Fuel cost</p>
+          <p className="font-mono tabular-nums text-2xl leading-none text-flare-700">AED {fmt(summary?.fuelCost)}</p>
+          <p className="meta mt-2">Self-clearance fuel (ADNOC)</p>
         </motion.div>
-        <motion.div variants={item} className={`card p-5 ${(summary?.net || 0) >= 0 ? 'border-emerald-100' : 'border-red-100'}`}>
-          <p className={`text-xs font-semibold mb-2 ${(summary?.net || 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>NET SAVINGS</p>
-          <p className={`text-2xl font-bold font-heading ${(summary?.net || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
-            AED {fmt(Math.abs(summary?.net))}
+        <motion.div
+          variants={item}
+          className={`px-5 py-4 border-t-2 sm:border-t-0 sm:border-l-2 border-ink-900 ${netPositive ? 'bg-green-500' : 'bg-flare-500'}`}
+        >
+          <p className="block text-2xs font-bold uppercase text-ink-900/70 mb-2">Net savings</p>
+          <p className="font-mono tabular-nums text-2xl leading-none text-ink-900">
+            {netPositive ? '' : '-'}AED {fmt(Math.abs(summary?.net))}
           </p>
-          <p className="text-xs text-ink-400 mt-1">Gross minus fuel costs</p>
+          <p className="text-xs font-mono text-ink-900/70 mt-2">Gross minus fuel costs</p>
         </motion.div>
       </motion.div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-paper-300 border border-paper-400 p-1 rounded-lg w-fit mb-5">
-        <button onClick={() => setTab('records')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'records' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>
-          Records ({total})
-        </button>
-        <button onClick={() => setTab('add')}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${tab === 'add' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500 hover:text-ink-700'}`}>
-          Add Record
-        </button>
+      {/* Segmented control */}
+      <div className="inline-flex border-2 border-ink-900 divide-x-2 divide-ink-900 mb-5">
+        {[
+          { id: 'records', label: `Records (${total})` },
+          { id: 'add',     label: 'Add Record' },
+        ].map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            aria-pressed={tab === t.id}
+            className={`px-4 py-2 text-xs font-bold uppercase transition-colors duration-[120ms] ${tab === t.id ? 'bg-ink-900 text-paper-100' : 'bg-white text-ink-600 hover:bg-paper-100'}`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* Records Tab */}
       {tab === 'records' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          {/* Filters */}
-          <div className="card p-4 mb-4">
-            <div className="grid grid-cols-4 gap-3">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12, ease: 'easeOut' }}>
+          {/* Filter strip */}
+          <div className="plate mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3">
               <div>
-                <label className="label text-xs">Business Unit</label>
+                <label className="label">Business Unit</label>
                 <Sel value={filterBU} onChange={setFilterBU} options={BUS} placeholder="All BUs" />
               </div>
               <div>
-                <label className="label text-xs">Import / Export</label>
+                <label className="label">Import / Export</label>
                 <Sel value={filterIE} onChange={setFilterIE} options={['Import', 'Export']} placeholder="All" />
               </div>
               <div>
-                <label className="label text-xs">From Date</label>
-                <input className="input text-sm" type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} />
+                <label className="label">From Date</label>
+                <input className="input font-mono" type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} />
               </div>
               <div>
-                <label className="label text-xs">To Date</label>
-                <input className="input text-sm" type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} />
+                <label className="label">To Date</label>
+                <input className="input font-mono" type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} />
               </div>
             </div>
-            {(filterBU || filterIE || filterFrom || filterTo) && (
+            {hasSavingsFilters && (
               <button
                 onClick={() => { setFilterBU(''); setFilterIE(''); setFilterFrom(''); setFilterTo(''); setPage(1); }}
-                className="mt-2 text-xs text-brand-600 font-medium hover:text-brand-700"
+                className="w-full px-3 py-2 text-xs font-bold uppercase text-ink-500 hover:text-ink-900 hover:bg-paper-100 border-t-2 border-ink-900 transition-colors duration-[120ms] text-left"
               >
                 Clear filters
               </button>
             )}
           </div>
 
-          {error && <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600">{error}</div>}
+          {error && <div className="mb-4 px-4 py-3 bg-flare-50 border-2 border-flare-700 text-sm text-flare-700">{error}</div>}
 
           {loading ? (
             <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
           ) : records.length === 0 ? (
-            <div className="card p-10 text-center">
-              <TrendingDown className="w-10 h-10 text-paper-500 mx-auto mb-3" />
-              <p className="text-ink-500 font-medium">No savings records yet</p>
-              <p className="text-sm text-ink-400 mt-1">Add records manually or import from CSV</p>
-              <button onClick={() => setTab('add')} className="mt-4 btn-primary text-sm">
-                <Plus className="w-4 h-4 inline mr-1" /> Add First Record
+            <div className="plate p-10 text-center">
+              <TrendingDown className="w-9 h-9 text-ink-300 mx-auto mb-3" strokeWidth={2} />
+              <p className="text-base w-wide text-ink-900">No savings records yet</p>
+              <p className="text-sm text-ink-500 mt-1">Add records manually or import from CSV</p>
+              <button onClick={() => setTab('add')} className="btn-primary btn-sm mt-4">
+                <Plus className="w-4 h-4" strokeWidth={2.5} /> Add First Record
               </button>
             </div>
           ) : (
-            <div className="card overflow-hidden">
+            <>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="ledger min-w-[1100px]">
                   <thead>
-                    <tr className="bg-paper-100 border-b border-paper-400">
-                      {['Date', 'BU', 'Port', 'Reference', 'I/E', 'Prev. Agent', 'Curr. Agent', 'Old Fee', 'New Fee', 'Savings', 'Description', ''].map(h => (
-                        <th key={h} className="text-left px-3 py-2.5 font-semibold text-xs text-ink-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    <tr>
+                      {['Date', 'BU', 'Port', 'Reference', 'I/E', 'Prev. Agent', 'Curr. Agent', 'Old Fee', 'New Fee', 'Savings', 'Description', ''].map((h, i) => (
+                        <th key={h || 'actions'} className={i >= 7 && i <= 9 ? '!text-right' : ''}>{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-paper-300">
-                    {records.map((r, i) => (
-                      <tr key={r.id} className="hover:bg-paper-100 transition-colors">
-                        <td className="px-3 py-2.5 text-ink-600 whitespace-nowrap">{r.date}</td>
-                        <td className="px-3 py-2.5 text-ink-700 font-medium">{r.business_unit || '—'}</td>
-                        <td className="px-3 py-2.5 text-ink-600">{r.port || '—'}</td>
-                        <td className="px-3 py-2.5 text-ink-600 font-mono text-xs">{r.reference_number || '—'}</td>
-                        <td className="px-3 py-2.5">
-                          <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${r.import_export === 'Export' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
-                            {r.import_export || '—'}
+                  <tbody>
+                    {records.map(r => (
+                      <tr key={r.id}>
+                        <td className="font-mono tabular-nums text-ink-700 whitespace-nowrap">{r.date}</td>
+                        <td className="text-ink-900 font-bold">{r.business_unit || '-'}</td>
+                        <td className="text-ink-700">{r.port || '-'}</td>
+                        <td className="font-mono text-xs text-ink-600">{r.reference_number || '-'}</td>
+                        <td>
+                          <span className={r.import_export === 'Export' ? 'tag-blue' : 'tag-wait'}>
+                            {r.import_export || '-'}
                           </span>
                         </td>
-                        <td className="px-3 py-2.5 text-ink-600 text-xs">{r.previous_agent || '—'}</td>
-                        <td className="px-3 py-2.5 text-ink-600 text-xs">{r.current_agent || '—'}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-ink-600">{fmt(r.old_fee)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono text-ink-600">{fmt(r.new_fee)}</td>
-                        <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700">{fmt(r.savings)}</td>
-                        <td className="px-3 py-2.5 text-ink-500 text-xs max-w-[160px] truncate">{r.description || '—'}</td>
-                        <td className="px-3 py-2.5">
-                          <button onClick={() => setConfirmDelete(r.id)} className="text-slate-300 hover:text-red-500 transition-colors">
-                            <Trash2 className="w-3.5 h-3.5" />
+                        <td className="text-ink-700">{r.previous_agent || '-'}</td>
+                        <td className="text-ink-700">{r.current_agent || '-'}</td>
+                        <td className="amount text-ink-600">{fmt(r.old_fee)}</td>
+                        <td className="amount text-ink-600">{fmt(r.new_fee)}</td>
+                        <td className="amount text-green-700">{fmt(r.savings)}</td>
+                        <td className="text-ink-500 max-w-[180px] truncate">{r.description || '-'}</td>
+                        <td>
+                          <button
+                            onClick={() => setConfirmDelete(r.id)}
+                            aria-label="Delete savings record"
+                            className="w-7 h-7 flex items-center justify-center text-ink-400 hover:text-flare-700 hover:bg-flare-50 transition-colors duration-[120ms]"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
                           </button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-brand-50 border-t-2 border-brand-200">
-                      <td colSpan={7} className="px-3 py-2.5 font-bold text-brand-700 text-sm">TOTAL ({total} records)</td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-brand-700">
+                    <tr className="border-t-2 border-ink-900 bg-white">
+                      <td colSpan={7} className="px-3 py-2.5 text-2xs font-bold uppercase text-ink-900">Total ({total} records)</td>
+                      <td className="px-3 py-2.5 amount text-sm text-ink-700">
                         {fmt(records.reduce((s, r) => s + (r.old_fee || 0), 0))}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-brand-700">
+                      <td className="px-3 py-2.5 amount text-sm text-ink-700">
                         {fmt(records.reduce((s, r) => s + (r.new_fee || 0), 0))}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 text-base">
+                      <td className="px-3 py-2.5 amount text-sm bg-green-500 text-ink-900">
                         {fmt(records.reduce((s, r) => s + (r.savings || 0), 0))}
                       </td>
-                      <td colSpan={2}></td>
+                      <td colSpan={2} />
                     </tr>
                   </tfoot>
                 </table>
@@ -544,151 +586,154 @@ export default function SavingsPage() {
 
               {/* Pagination */}
               {total > 50 && (
-                <div className="px-4 py-3 border-t border-paper-400 flex items-center justify-between text-sm text-ink-500">
-                  <span>Showing {Math.min((page - 1) * 50 + 1, total)}–{Math.min(page * 50, total)} of {total}</span>
+                <div className="px-3 py-2.5 border-2 border-t-0 border-ink-900 bg-white flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-mono text-2xs uppercase text-ink-400">
+                    Showing {Math.min((page - 1) * 50 + 1, total)} to {Math.min(page * 50, total)} of {total}
+                  </span>
                   <div className="flex gap-2">
-                    <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="btn-secondary text-xs px-2.5 py-1.5 disabled:opacity-40">Prev</button>
-                    <button disabled={page * 50 >= total} onClick={() => setPage(p => p + 1)} className="btn-secondary text-xs px-2.5 py-1.5 disabled:opacity-40">Next</button>
+                    <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="btn-ghost btn-sm">Prev</button>
+                    <button disabled={page * 50 >= total} onClick={() => setPage(p => p + 1)} className="btn-ghost btn-sm">Next</button>
                   </div>
                 </div>
               )}
-            </div>
+            </>
           )}
         </motion.div>
       )}
 
       {/* Add Record Tab */}
       {tab === 'add' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-2xl">
-          <div className="card p-6">
-            <h2 className="font-heading font-bold text-ink-800 mb-5">New Savings Record</h2>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12, ease: 'easeOut' }} className="max-w-2xl">
+          <div className="plate">
+            <div className="px-4 py-3 border-b-2 border-ink-900">
+              <h2 className="text-base w-wide text-ink-900">New Savings Record</h2>
+            </div>
 
-            {formError && <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600">{formError}</div>}
+            <div className="p-4 sm:p-5">
+              {formError && <div className="mb-4 px-4 py-3 bg-flare-50 border-2 border-flare-700 text-sm text-flare-700">{formError}</div>}
 
-            {/* Link to existing shipping expense */}
-            {shippingExpenses.length > 0 && (
-              <div className="mb-5 p-4 bg-paper-100 rounded-lg border border-paper-400">
-                <label className="flex items-center gap-2 text-sm font-semibold text-ink-800 mb-2">
-                  <Link2 className="w-4 h-4 text-brand-500" />
-                  Auto-fill from a recorded shipping bill (optional)
-                </label>
-                <div className="relative">
-                  <select
-                    value={linkedExpense}
-                    onChange={e => handleLinkExpense(e.target.value)}
-                    className="input appearance-none pr-8 cursor-pointer text-sm"
-                  >
-                    <option value="">— Pick a shipping expense to auto-fill —</option>
-                    {shippingExpenses.map(e => {
-                      const agentFeeItem = (e.line_items || []).find(li =>
-                        li.label?.toLowerCase().includes('agent') || li.name?.toLowerCase().includes('agent')
-                      );
-                      const agentFee = agentFeeItem ? parseFloat(agentFeeItem.amount) : 0;
-                      const bl = e.bl_numbers?.[0] || e.bl_number || '';
-                      return (
-                        <option key={e.id} value={e.id}>
-                          {e.date} · {e.vendor_name}{bl ? ` · BL: ${bl}` : ''}{agentFee > 0 ? ` · Agent Fee: AED ${agentFee}` : ''}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400 pointer-events-none" />
-                </div>
-                {linkedExpense && (
-                  <p className="text-xs text-brand-600 mt-1.5 font-medium">
-                    ✓ Date, port, BU, current agent and new fee filled from the selected bill. Only enter the old agent fee below.
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">Date *</label>
-                <input className="input" type="date" value={form.date} onChange={e => setF('date', e.target.value)} />
-              </div>
-              <div>
-                <label className="label">Month</label>
-                <input className="input" value={form.month} onChange={e => setF('month', e.target.value)} placeholder="e.g. January 2026" />
-              </div>
-              <div>
-                <label className="label">Business Unit</label>
-                <Sel value={form.business_unit} onChange={v => setF('business_unit', v)} options={BUS} placeholder="Select BU" />
-              </div>
-              <div>
-                <label className="label">Port</label>
-                <Sel value={form.port} onChange={v => setF('port', v)} options={PORTS} placeholder="Select port" />
-              </div>
-              <div>
-                <label className="label">Reference Number</label>
-                <input className="input" value={form.reference_number} onChange={e => setF('reference_number', e.target.value)} placeholder="REF-001" />
-              </div>
-              <div>
-                <label className="label">Import / Export</label>
-                <Sel value={form.import_export} onChange={v => setF('import_export', v)} options={['Import', 'Export']} />
-              </div>
-              <div>
-                <label className="label">Previous Agent</label>
-                <input
-                  className="input"
-                  value={form.previous_agent}
-                  onChange={e => {
-                    setF('previous_agent', e.target.value);
-                    lookupAgentRate(e.target.value, form.port, form.import_export);
-                  }}
-                  placeholder="e.g. Al Bahar"
-                />
-              </div>
-              <div>
-                <label className="label">Current Agent</label>
-                <input className="input" value={form.current_agent} onChange={e => setF('current_agent', e.target.value)} placeholder="e.g. AL GHARBEYA / In House" />
-              </div>
-              <div>
-                <label className="label">Old Fee (AED) *</label>
-                <input className="input" type="number" step="0.01" min="0" value={form.old_fee} onChange={e => setF('old_fee', e.target.value)} placeholder="225.00" />
-                {agentSuggestion != null && !form.old_fee && (
-                  <button
-                    type="button"
-                    onClick={() => setF('old_fee', String(agentSuggestion))}
-                    className="mt-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
-                  >
-                    ↑ Use AED {fmt(agentSuggestion)} from past records
-                  </button>
-                )}
-              </div>
-              <div>
-                <label className="label">New Fee (AED)</label>
-                <input className="input" type="number" step="0.01" min="0" value={form.new_fee} onChange={e => setF('new_fee', e.target.value)} placeholder="43.00" />
-              </div>
-
-              {computedSavings !== null && (
-                <div className="col-span-2 p-3 rounded-lg bg-emerald-50 border border-emerald-100">
-                  <p className="text-sm font-semibold text-emerald-700">
-                    Savings = AED {fmt(computedSavings)}
-                    {computedSavings < 0 && <span className="text-red-600 ml-2">(negative — new fee exceeds old fee)</span>}
-                  </p>
+              {/* Link to existing shipping expense */}
+              {shippingExpenses.length > 0 && (
+                <div className="mb-5 p-4 bg-blue-50 border-2 border-blue-600">
+                  <label className="flex items-center gap-2 text-sm font-bold text-ink-900 mb-2">
+                    <Link2 className="w-4 h-4 text-blue-600" strokeWidth={2} />
+                    Auto-fill from a recorded shipping bill (optional)
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={linkedExpense}
+                      onChange={e => handleLinkExpense(e.target.value)}
+                      className="select"
+                    >
+                      <option value="">Pick a shipping expense to auto-fill</option>
+                      {shippingExpenses.map(e => {
+                        const agentFeeItem = (e.line_items || []).find(li =>
+                          li.label?.toLowerCase().includes('agent') || li.name?.toLowerCase().includes('agent')
+                        );
+                        const agentFee = agentFeeItem ? parseFloat(agentFeeItem.amount) : 0;
+                        const bl = e.bl_numbers?.[0] || e.bl_number || '';
+                        return (
+                          <option key={e.id} value={e.id}>
+                            {e.date} · {e.vendor_name}{bl ? ` · BL: ${bl}` : ''}{agentFee > 0 ? ` · Agent Fee: AED ${agentFee}` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-500 pointer-events-none" strokeWidth={2} />
+                  </div>
+                  {linkedExpense && (
+                    <p className="text-sm text-blue-600 mt-2">
+                      Date, port, BU, current agent and new fee filled from the selected bill. Only enter the old agent fee below.
+                    </p>
+                  )}
                 </div>
               )}
 
-              <div>
-                <label className="label">Project Name</label>
-                <input className="input" value={form.project_name} onChange={e => setF('project_name', e.target.value)} placeholder="Project / cargo name" />
-              </div>
-              <div className="col-span-2">
-                <label className="label">Description</label>
-                <textarea className="input resize-none" rows={2} value={form.description} onChange={e => setF('description', e.target.value)} placeholder="Additional details about the clearance..." />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Date *</label>
+                  <input className="input font-mono" type="date" value={form.date} onChange={e => setF('date', e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Month</label>
+                  <input className="input" value={form.month} onChange={e => setF('month', e.target.value)} placeholder="e.g. January 2026" />
+                </div>
+                <div>
+                  <label className="label">Business Unit</label>
+                  <Sel value={form.business_unit} onChange={v => setF('business_unit', v)} options={BUS} placeholder="Select BU" />
+                </div>
+                <div>
+                  <label className="label">Port</label>
+                  <Sel value={form.port} onChange={v => setF('port', v)} options={PORTS} placeholder="Select port" />
+                </div>
+                <div>
+                  <label className="label">Reference Number</label>
+                  <input className="input font-mono" value={form.reference_number} onChange={e => setF('reference_number', e.target.value)} placeholder="REF-001" />
+                </div>
+                <div>
+                  <label className="label">Import / Export</label>
+                  <Sel value={form.import_export} onChange={v => setF('import_export', v)} options={['Import', 'Export']} />
+                </div>
+                <div>
+                  <label className="label">Previous Agent</label>
+                  <input
+                    className="input"
+                    value={form.previous_agent}
+                    onChange={e => {
+                      setF('previous_agent', e.target.value);
+                      lookupAgentRate(e.target.value, form.port, form.import_export);
+                    }}
+                    placeholder="e.g. Al Bahar"
+                  />
+                </div>
+                <div>
+                  <label className="label">Current Agent</label>
+                  <input className="input" value={form.current_agent} onChange={e => setF('current_agent', e.target.value)} placeholder="e.g. AL GHARBEYA / In House" />
+                </div>
+                <div>
+                  <label className="label">Old Fee (AED) *</label>
+                  <input className="input font-mono tabular-nums" type="number" step="0.01" min="0" value={form.old_fee} onChange={e => setF('old_fee', e.target.value)} placeholder="225.00" />
+                  {agentSuggestion != null && !form.old_fee && (
+                    <button
+                      type="button"
+                      onClick={() => setF('old_fee', String(agentSuggestion))}
+                      className="mt-1.5 text-xs font-bold uppercase text-blue-600 hover:text-blue-800 transition-colors duration-[120ms]"
+                    >
+                      Use AED {fmt(agentSuggestion)} from past records
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <label className="label">New Fee (AED)</label>
+                  <input className="input font-mono tabular-nums" type="number" step="0.01" min="0" value={form.new_fee} onChange={e => setF('new_fee', e.target.value)} placeholder="43.00" />
+                </div>
+
+                {computedSavings !== null && (
+                  <div className={`sm:col-span-2 p-3 border-2 border-ink-900 ${computedSavings < 0 ? 'bg-flare-500' : 'bg-green-500'}`}>
+                    <p className="text-sm font-bold text-ink-900">
+                      Savings = <span className="font-mono tabular-nums font-normal">AED {fmt(computedSavings)}</span>
+                      {computedSavings < 0 && <span className="block text-xs mt-0.5">Negative: new fee exceeds old fee</span>}
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="label">Project Name</label>
+                  <input className="input" value={form.project_name} onChange={e => setF('project_name', e.target.value)} placeholder="Project / cargo name" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="label">Description</label>
+                  <textarea className="textarea resize-none" rows={2} value={form.description} onChange={e => setF('description', e.target.value)} placeholder="Additional details about the clearance..." />
+                </div>
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6 pt-4 border-t border-paper-300">
-              <button onClick={() => { setTab('records'); setForm(EMPTY_FORM); setFormError(''); setLinkedExpense(''); }} className="btn-secondary">
+            <div className="flex gap-3 px-4 py-3 border-t-2 border-ink-900">
+              <button onClick={() => { setTab('records'); setForm(EMPTY_FORM); setFormError(''); setLinkedExpense(''); }} className="btn-ghost">
                 Cancel
               </button>
-              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                {saving
-                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</>
-                  : 'Save Record'
-                }
+              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
+                {saving ? 'Saving...' : 'Save Record'}
               </button>
             </div>
           </div>
