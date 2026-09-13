@@ -1,10 +1,12 @@
-# Agthia Petty Cash — Project Brief
+# Doc Ledger — Project Brief
 
 ## What This Is
 
-A production web app for **Agthia Group (UAE)** to record, track, and manage petty cash expenses. It replaces manual Excel/paper systems. Employees upload a photo or PDF of a receipt → Claude AI auto-fills all fields → the record is saved. Finance can then export polished Excel reports and track freight cost savings.
+A multi-tenant web app for recording and reporting petty cash expenses. Staff upload a photo or PDF of a receipt, Claude extracts the fields, a person reviews and saves. Finance then exports branded Excel reports and tracks freight clearance savings.
 
-**Live on Railway** at `helpful-freedom` project, Singapore region, with a persistent volume at `/data` (mount path) so the SQLite database and uploaded files survive redeployments.
+Every organisation is an isolated tenant. All data is scoped by `org_id`; a single platform owner (`users.is_superadmin`) can see and manage across tenants.
+
+**Deployed on Vercel.** Postgres on Neon, receipts in Vercel Blob. Branch `claude/stoic-bell-sZZ57` auto-deploys.
 
 ---
 
@@ -12,12 +14,27 @@ A production web app for **Agthia Group (UAE)** to record, track, and manage pet
 
 | Layer | Tech |
 |-------|------|
-| Frontend | React 18 + Vite + Tailwind CSS + Framer Motion + Recharts |
-| Backend | Node.js + Express |
-| Database | SQLite via better-sqlite3 (WAL mode) |
+| Frontend | React 18 + Vite + Tailwind + Framer Motion + Recharts |
+| Backend | Express, exported as a Vercel serverless function |
+| Database | Neon Postgres via `@neondatabase/serverless` |
+| File storage | Vercel Blob |
 | AI | Claude API (`claude-sonnet-4-6`) — vision for images, document API for PDFs |
-| Export | ExcelJS (4-sheet branded workbooks) |
-| Hosting | Railway (auto-deploys from `claude/stoic-bell-sZZ57` branch) |
+| Export | ExcelJS (4-sheet workbooks) |
+
+---
+
+## Serverless constraints — read before touching the server
+
+The app runs as a function invocation, not a long-lived process. `server/app.js` builds and **exports** the Express app; it never calls `.listen()`. Consequences that have already bitten this codebase once:
+
+- **No `process.exit`.** Missing env vars are surfaced as a clean 500 at first use, not a fatal at startup, because exiting on cold start produces an unreadable platform error.
+- **No crons or timers.** The nightly backup and the 7-day upload sweep are gone. Neon has point-in-time recovery; blob cleanup must happen inline on delete.
+- **No SIGTERM handlers**, no graceful shutdown.
+- **No local filesystem for persistence.** Uploads go straight to Blob from memory.
+- **No in-memory state between requests.** This is why `express-rate-limit` was removed: every invocation is a fresh isolate with its own empty counter map, so the limit was neither shared nor durable. Rate limiting belongs on Vercel → Firewall.
+- **No DDL at request time.** Schema is applied by `npm run db:migrate`, explicitly, never on cold start.
+
+`server/dev.js` wraps the same app in a real listener for local work.
 
 ---
 
@@ -25,124 +42,75 @@ A production web app for **Agthia Group (UAE)** to record, track, and manage pet
 
 ```
 Petty-Cash-/
-├── CLAUDE.md                        ← you are here
-├── .env                             ← ANTHROPIC_API_KEY (not committed)
-├── railway.json
-├── package.json                     ← root scripts (dev, build, start)
-├── data/
-│   ├── agthia.db                    ← SQLite database (persistent volume on Railway)
-│   └── uploads/                     ← uploaded receipt images
+├── CLAUDE.md
+├── vercel.json                  ← build, function config, SPA rewrites
+├── api/index.js                 ← Vercel entry; exports the Express app
 ├── server/
-│   ├── server.js                    ← Express entry point
-│   ├── config/paths.js              ← resolves DATA_DIR / DB_PATH / UPLOADS_DIR
-│   ├── db/database.js               ← schema, migrations, indexes
-│   └── routes/
-│       ├── records.js               ← CRUD + dashboard stats
-│       ├── upload.js                ← file upload + AI parsing trigger
-│       ├── export.js                ← Excel report generation
-│       ├── settings.js              ← exchange rates config
-│       └── savings.js               ← freight savings tracker
+│   ├── app.js                   ← builds + exports the app (never listens)
+│   ├── dev.js                   ← local listener
+│   ├── db/
+│   │   ├── index.js             ← Neon client, transactions, type parsers
+│   │   ├── schema.sql           ← idempotent Postgres DDL
+│   │   ├── migrate.js           ← npm run db:migrate
+│   │   └── seed.js              ← org 1, built-in expense types, owner
+│   ├── middleware/auth.js       ← cookie sessions, requireAuth, requireSuperadmin
+│   ├── routes/                  ← records, upload, export, settings, savings,
+│   │                              auth, members, expense-types, platform
 │   └── utils/
-│       └── parser.js                ← Claude API integration (core extraction logic)
+│       ├── parser.js            ← Claude extraction
+│       └── money.js             ← integer-fils arithmetic
 └── client/
-    ├── tailwind.config.js           ← Agthia sage-green brand palette
+    ├── tailwind.config.js       ← Overprint tokens
     └── src/
-        ├── App.jsx                  ← router, ErrorBoundary, ToastProvider
+        ├── index.css            ← component layer + contrast table
         ├── components/
-        │   ├── Sidebar.jsx          ← nav (Dashboard, Add Expense, Records, Savings, Settings)
-        │   ├── Toast.jsx            ← global toast context (success/error/info)
-        │   ├── ErrorBoundary.jsx    ← crash fallback
-        │   └── ConfirmDialog.jsx    ← replaces native confirm()
         └── pages/
-            ├── DashboardPage.jsx    ← KPIs, charts, recent transactions
-            ├── UploadPage.jsx       ← upload + AI extraction + review form
-            ├── RecordsPage.jsx      ← sortable/filterable expense table
-            ├── SavingsPage.jsx      ← freight savings dashboard
-            └── SettingsPage.jsx     ← exchange rate config
 ```
+
+---
+
+## Postgres conventions
+
+These are deliberate. Changing them will break things in non-obvious ways.
+
+- **`date` columns stay `TEXT`** in `YYYY-MM-DD` form. They are compared and grouped as text and handed to the client verbatim. Making them `DATE` returns JS `Date` objects and introduces timezone drift in reports.
+- **JSON blobs stay `TEXT`** with explicit `JSON.parse`/`stringify` (`line_items`, `bl_numbers`, `container_numbers`, `custom_fields`, `fields_schema`). `JSONB` looks tempting but node-postgres serializes JS arrays to Postgres *array literals* rather than JSON, and `settings.value` stores bare strings too.
+- **Money is `DOUBLE PRECISION`.** `NUMERIC` is more correct but node-postgres returns it as a *string*, which breaks every consumer. Arithmetic is done in integer fils in `utils/money.js`.
+- **`int8` and `numeric` are parsed back to JS numbers** once, globally, in `db/index.js`. Without that, every `BIGSERIAL` id and `COUNT(*)` reaches the client quoted.
+- **Email uniqueness is a functional index on `LOWER(email)`.** SQLite's `COLLATE NOCASE` has no Postgres equivalent without CITEXT, so every read and write lowercases first. Unique violations are `err.code === '23505'`, not a string match.
+- **Route params go through `toId()`.** Postgres raises on `id = 'abc'` where SQLite silently matched nothing, so junk ids must 404 rather than 500.
 
 ---
 
 ## Core Concepts
 
-### Three Expense Types
+**Expense types** — three built in (`general`, `adnoc` fuel, `shipping` freight), plus per-org custom types with a user-defined field schema and AI extraction hints.
 
-| Type | Fields | Use case |
-|------|--------|----------|
-| `general` | Standard petty cash fields | Office supplies, meals, misc |
-| `adnoc` | + fuel type, litres, odometer, plate | ADNOC/ENOC fuel receipts |
-| `shipping` | + BL numbers, container numbers, port, line items, clearance savings | Freight & customs bills |
+**Multi-currency** — amounts stored as entered, with `amount_aed` computed at save time from the org's configured rates. Historical records do **not** re-convert when rates change. This is intentional for accounting correctness.
 
-### Multi-Currency
-All amounts stored as-is in `amount` + `currency`. A computed `amount_aed` column stores the AED equivalent using exchange rates from the `settings` table. Exchange rates are user-configurable in Settings.
+**Clearance savings** — a shipping expense can auto-create a `clearance_savings` row tracking `old_fee` minus `new_fee`. Surfaced on the Savings page and Excel sheet 4.
 
-### Clearance Savings
-When a shipping expense is saved, the system can auto-create a `clearance_savings` record tracking:
-- `old_fee` (previous clearing agent cost)
-- `new_fee` (current cost)
-- `savings` = old − new
-
-This is surfaced on the Savings page and in the Excel export Sheet 4.
+**Duplicate detection, three tiers** — (1) exact file SHA-256 → hard reject; (2) invoice + vendor + date + amount → hard reject; (3) no invoice, same vendor + date + amount → soft warning with a 201.
 
 ---
 
-## Database Schema
+## Design System: Overprint
 
-### `expenses`
-```
-id, invoice_number, vendor_name, amount, currency, amount_aed, exchange_rate,
-date, category, business_unit, payment_method, purpose, submitted_by,
-expense_type, line_items (JSON), notes, image_path,
-bl_number, bl_numbers (JSON), container_number, container_numbers (JSON),
-port, shipment_type, created_at
-```
+Two-ink risograph logic. Flat spot colours that multiply where they cross, hard rectangles, no shadow anywhere.
 
-### `clearance_savings`
-```
-id, expense_id (FK), date, month, business_unit, port, reference_number,
-import_export, previous_agent, current_agent, old_fee, new_fee, savings,
-project_name, description, created_at
-```
+- **Inks:** paper `#EDECE8`, federal blue `#22356F` (primary), flare orange `#FF4A17` (attention, destructive), riso green `#00A95C` (resolved, saved, used sparingly). "Waiting" is deliberately **uncoloured** — an ink outline on paper.
+- **Type:** Archivo (width axis; `.w-wide` / `.w-wider` utilities) and Fragment Mono for all numbers, dates and IDs. Fragment Mono is single-weight — never bold it.
+- **Geometry:** `borderRadius` and `boxShadow` are *overridden* in the Tailwind config, not extended, so a stray `rounded-lg` or `shadow-md` cannot reintroduce the old look. Structural borders are `border-2 border-ink-900`; row dividers are `border-paper-300`.
+- **Motion:** 120ms ease-out, opacity and 4px translate. No spring, no bounce, no scale on press.
 
-### `settings`
-```
-key, value   ← stores JSON blob for exchange_rates
-```
+### Contrast rules — measured, and the obvious choices fail
 
----
+The full table lives at the top of `client/src/index.css`. The two that catch people:
 
-## AI Extraction (parser.js)
+- **White on `flare-500` is 3.4:1 and fails.** Text on flare and green fills is `ink-900`.
+- **Flare and green as *text* on paper must use the `-700` steps** (`flare-500` on paper is only 2.7:1).
 
-- Model: `claude-sonnet-4-6`, `temperature: 0`, `max_tokens: 8192`
-- SDK retry: `maxRetries: 4, timeout: 90_000`
-- Prompt caching: static system prompt sent with `cache_control: { type: 'ephemeral' }`
-- Images → base64 encoded as `image` media type
-- PDFs → base64 encoded as `document` media type (Claude document API)
-- Three separate prompt builders: `buildGeneralPrompt`, `buildShippingPrompt`, `buildAdnocPrompt`
-- Falls back to a safe defaults object if extraction fails — never crashes the upload
-
----
-
-## Design System
-
-- **Brand colour:** Agthia sage-green `#62833A` (Tailwind alias `brand-600`)
-- **Font:** DM Sans (headings), Inter (body)
-- **Logo:** Circular leaf badge + lowercase "agthia" wordmark + "Petty Cash" subtitle
-- **Dark theme:** Background `#0d1117`, cards `slate-800/900`, borders `white/[0.06]`
-- **Version:** v1.8.0 (shown in sidebar footer)
-
----
-
-## Data Persistence (Railway)
-
-`server/config/paths.js` resolves storage location in this order:
-1. `DATA_DIR` env var
-2. `RAILWAY_VOLUME_MOUNT_PATH` (set automatically when a Railway Volume is attached)
-3. Fallback: `./data/` inside the repo (ephemeral — data lost on redeploy)
-
-**Volume is attached** at `/data`, Singapore region — database and uploads are persistent.
-
-Boot log confirms: `[storage] data dir: /data  (persistent volume: YES)`
+`ink-500` is the floor for secondary text, `ink-400` for meta, `ink-300` is placeholders and large text only, `ink-200` is never text. Minimum readable size is 13px; 10-11px is reserved for tracked uppercase labels.
 
 ---
 
@@ -150,74 +118,30 @@ Boot log confirms: `[storage] data dir: /data  (persistent volume: YES)`
 
 | Variable | Required | Notes |
 |----------|----------|-------|
-| `ANTHROPIC_API_KEY` | Yes | Server exits on startup if missing |
-| `PORT` | No | Defaults to 3001 |
-| `RAILWAY_VOLUME_MOUNT_PATH` | No | Set automatically by Railway when volume is attached |
-| `DATA_DIR` | No | Override storage path manually |
+| `DATABASE_URL` | Yes | Neon pooled connection string |
+| `BLOB_READ_WRITE_TOKEN` | Yes | Vercel Blob store |
+| `ANTHROPIC_API_KEY` | Yes | Receipt extraction |
+| `SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD` | No | Creates one owner for org 1 on seed |
 
 ---
 
-## Dev Commands
+## Commands
 
 ```bash
-npm run dev        # runs server (nodemon :3001) + client (vite :5173) concurrently
-npm run build      # builds React into client/dist
-npm start          # production: serves built client + API from :3001
+npm run install:all
+npm run dev            # server :3001 + client :5173
+npm run db:migrate     # apply schema.sql, then seed. Run once against Neon.
+npm run db:seed        # seed only
+npm run build          # build the client
 ```
 
 ---
 
-## Railway Deployment
+## Known gaps
 
-- Branch `claude/stoic-bell-sZZ57` → auto-deploys to production on push
-- Volume: `petty-cash--volume` mounted at `/data`, Southeast Asia (Singapore)
-- Volume size: 500 MB (actual usage will be <10 MB for years)
-- On each deploy: container is replaced, but `/data` volume persists
-
----
-
-## Key Business Rules
-
-- **Duplicate detection:** Same invoice number + vendor + date + amount → rejected
-- **Cascade delete:** Deleting an expense also removes its linked `clearance_savings` row
-- **7-day upload cleanup:** Files in `/data/uploads` older than 7 days are auto-deleted
-- **Rate limit:** 500 requests per 15 minutes per IP (no separate upload limit)
-- **File size limit:** 15 MB per upload
-- **Accepted file types:** JPG, PNG, WebP, PDF
-
----
-
-## Excel Export (export.js)
-
-Four sheets, Agthia sage-green palette, frozen headers, auto-filter:
-
-1. **Summary** — KPIs (total spend, count, avg), breakdowns by category / type / business unit
-2. **All Expenses** — one row per expense, 19 columns including exchange rate and port info
-3. **Shipping Details** — line-item charge breakdown grouped per bill
-4. **Savings Report** — monthly freight savings with net-savings box (gross savings − fuel cost)
-
----
-
-## Phase 0 Hardening (completed)
-
-- **Receipt retention fix** — cleanup only deletes orphaned files (no `image_path` reference); linked receipts kept forever for audit trail
-- **Money math** — `server/utils/money.js` with `toFils/fromFils/addMoney/convertToAed`; all totals use integer fils to avoid float drift (0.1+0.2===0.3)
-- **AED conversion rules** — AED forces `exchange_rate=1`; foreign currency validated against supported list; `amount_aed` is a snapshot at save time — **historical records do NOT re-convert when rates change; this is intentional for accounting correctness**
-- **Duplicate detection (3 tiers)** — (1) exact file SHA-256 hash → hard reject; (2) invoice+vendor+date+amount → hard reject; (3) no invoice, same vendor+date+amount → soft warning returned with 201
-- **AI extraction validation** — post-extraction checks: positive amount, date sanity (not future, not >2y), supported currency, shipping line_items sum vs total (±0.50 tolerance), low-confidence fields → `needs_review` + `review_notes` persisted on expense
-- **Savings math fixed** — removed all-ADNOC fuel deduction from net savings (ADNOC covers all fuel, not just clearance trips); Sheet 4 shows gross savings only with explicit formula note cell
-- **Express hardening** — `trust proxy 1` for Railway; nightly SQLite backup to `/data/backups/agthia-YYYY-MM-DD.db` (keeps 14); version bumped to v1.8.0
-
-## What's Been Built (history)
-
-- Production hardening: Helmet, compression, rate limiting, graceful shutdown, env validation
-- Global Toast system, ErrorBoundary, ConfirmDialog (replaces native `confirm()`)
-- Sortable columns on Records table
-- Agthia brand design: sage-green palette, circular leaf logo, dark theme
-- Railway persistent volume fix (the critical data-loss fix)
-- Excel export full rewrite with 4 sheets and brand styling
-- Claude extraction improvements: temperature=0, prompt caching, SDK retry, PDF support
-
-## Pending / Discussed (not yet built)
-
-- Bulk upload (Excel template import + PDF dropzone) — design discussed, not started
+- **Blobs are never deleted.** `put` is used; `del` is not. Deleting an expense or wiping an org leaves the receipts in storage indefinitely. Receipts are uploaded `access: 'public'`, so anyone with the URL can read one. This matches the old Railway behaviour (`express.static` on `/uploads`, also unauthenticated) but the missing cleanup makes retention worse.
+- **No rate limiting** until it is configured at Vercel → Firewall.
+- **`package-lock.json` is not committed.** Run `npm install` and commit the result to restore reproducible builds.
+- **Records header and Savings footer totals** sum only the loaded page, not the full result set, while displaying the full server count beside them.
+- **Soft duplicate warnings** (tier 3) are returned by the API but not surfaced anywhere in the upload UI.
+- Neon's own transport, Vercel Blob `put()`, and the full frontend integration have not been exercised against real infrastructure yet. The Postgres conversion was verified against PGlite, which is real Postgres but not Neon.
