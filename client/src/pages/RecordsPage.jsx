@@ -49,7 +49,7 @@ const CATEGORY_TAGS = {
 const receiptHref = (id) => `/api/records/${id}/receipt`;
 const isPdf = (p) => /\.pdf(\?|#|$)/i.test(p || '');
 
-// ─── Modal shell — flat scrim, white plate, 2px ink rule ────────────────────
+// ─── Modal shell — flat scrim, white plate, 2px ink rule ──────────────────────
 function Modal({ title, onClose, children, footer, size = 'max-w-md' }) {
   useEffect(() => {
     const handle = (e) => { if (e.key === 'Escape') onClose(); };
@@ -77,7 +77,7 @@ function Modal({ title, onClose, children, footer, size = 'max-w-md' }) {
   );
 }
 
-// ─── Export Modal ───────────────────────────────────────────────────────────
+// ─── Export Modal ─────────────────────────────────────────────────────────────
 function ExportModal({ onClose }) {
   const [type, setType]         = useState('all');
   const [from, setFrom]         = useState('');
@@ -142,7 +142,7 @@ function ExportModal({ onClose }) {
   );
 }
 
-// ─── Edit Modal ───────────────────────────────────────────────────────────────
+// ─── Edit Modal ────────────────────────────────────────────────────────────────
 function EditModal({ record, onClose, onSave }) {
   const toast = useToast();
   const [form, setForm] = useState({ ...record, line_items: undefined });
