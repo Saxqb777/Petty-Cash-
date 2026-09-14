@@ -8,6 +8,8 @@ dist/
 *.log
 .idea/
 .vscode/
+__pycache__/
+*.pyc
 
 # Generated document. Rebuild with: python3 docs/build_sop.py
 docs/*.pdf
