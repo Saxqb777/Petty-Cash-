@@ -60,13 +60,12 @@ const STANDARD_KEYS = new Set([
 
 const fmt = (n) => parseFloat(n || 0).toFixed(2);
 
-/* Receipt sources arrive either as a local object URL, an absolute blob URL
-   (the backend is moving to https:// storage) or a legacy relative path. */
-const resolveAsset = (path) => {
-  if (!path) return '';
-  if (/^(https?:|blob:|data:)/i.test(path)) return path;
-  return path.startsWith('/') ? path : `/uploads/${path}`;
-};
+/* The preview shown while reviewing is the file the user just picked, held as
+   a local object URL, so nothing is fetched from storage here. Saved receipts
+   live in a private store and are only ever read through
+   /api/records/:id/receipt, which signs a short-lived link after checking the
+   session. */
+const resolveAsset = (src) => (/^(blob:|data:|https?:)/i.test(src || '') ? src : '');
 
 const EMPTY_FLAGS = new Set();
 
