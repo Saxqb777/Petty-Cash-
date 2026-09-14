@@ -43,15 +43,13 @@ const CATEGORY_TAGS = {
   'Miscellaneous':          'tag-muted',
 };
 
-// image_path may arrive as a full blob URL or as a legacy relative upload path.
-const fileHref = (p) => {
-  if (!p) return '';
-  if (/^https?:\/\//i.test(p)) return p;
-  return p.startsWith('/') ? p : `/${p}`;
-};
+// Receipts live in a private store, so image_path is not fetchable directly.
+// This endpoint checks the session and the org, then redirects to a signed
+// link that expires in minutes.
+const receiptHref = (id) => `/api/records/${id}/receipt`;
 const isPdf = (p) => /\.pdf(\?|#|$)/i.test(p || '');
 
-// ─── Modal shell — flat scrim, white plate, 2px ink rule ──────────────────────
+// ─── Modal shell — flat scrim, white plate, 2px ink rule ────────────────────
 function Modal({ title, onClose, children, footer, size = 'max-w-md' }) {
   useEffect(() => {
     const handle = (e) => { if (e.key === 'Escape') onClose(); };
@@ -79,7 +77,7 @@ function Modal({ title, onClose, children, footer, size = 'max-w-md' }) {
   );
 }
 
-// ─── Export Modal ─────────────────────────────────────────────────────────────
+// ─── Export Modal ───────────────────────────────────────────────────────────
 function ExportModal({ onClose }) {
   const [type, setType]         = useState('all');
   const [from, setFrom]         = useState('');
@@ -144,7 +142,7 @@ function ExportModal({ onClose }) {
   );
 }
 
-// ─── Edit Modal ────────────────────────────────────────────────────────────────
+// ─── Edit Modal ───────────────────────────────────────────────────────────────
 function EditModal({ record, onClose, onSave }) {
   const toast = useToast();
   const [form, setForm] = useState({ ...record, line_items: undefined });
@@ -616,12 +614,12 @@ export default function RecordsPage() {
                               <div className="sm:col-span-2 lg:col-span-4">
                                 <p className="label">Bill</p>
                                 {isPdf(r.image_path) ? (
-                                  <a href={fileHref(r.image_path)} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">
+                                  <a href={receiptHref(r.id)} target="_blank" rel="noopener noreferrer" className="btn-ghost btn-sm">
                                     <FileText className="w-3.5 h-3.5" strokeWidth={2} /> View PDF
                                   </a>
                                 ) : (
-                                  <a href={fileHref(r.image_path)} target="_blank" rel="noopener noreferrer" className="inline-block">
-                                    <img src={fileHref(r.image_path)} alt="Bill" className="h-28 max-w-full object-contain border-2 border-ink-900 bg-white hover:opacity-80 transition-opacity duration-[120ms]" />
+                                  <a href={receiptHref(r.id)} target="_blank" rel="noopener noreferrer" className="inline-block">
+                                    <img src={receiptHref(r.id)} alt="Bill" className="h-28 max-w-full object-contain border-2 border-ink-900 bg-white hover:opacity-80 transition-opacity duration-[120ms]" />
                                   </a>
                                 )}
                               </div>
