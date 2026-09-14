@@ -553,6 +553,7 @@ export default function UploadPage() {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [previewIsPdf, setPreviewIsPdf] = useState(false);
   const [fileName, setFileName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -641,7 +642,11 @@ export default function UploadPage() {
         return Math.min(88, p + step);
       });
     }, 180);
-    setPreview(file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : URL.createObjectURL(file));
+    // Keep the object URL for PDFs too, so the document can be shown beside
+    // the form rather than reduced to an icon. The review step exists to
+    // compare the two, which is impossible if only one of them is on screen.
+    setPreviewIsPdf(file.name.toLowerCase().endsWith('.pdf'));
+    setPreview(URL.createObjectURL(file));
 
     try {
       const result = await api.uploadBill(file, selectedType.slug);
@@ -730,7 +735,7 @@ export default function UploadPage() {
       setStage('extracted');
     } catch (e) {
       toast.error(`Upload failed: ${e.message}`);
-      setPreview(null);
+      setPreview(null); setPreviewIsPdf(false);
     } finally {
       clearInterval(progressRef.current);
       setUploadProgress(100);
@@ -829,7 +834,7 @@ export default function UploadPage() {
   };
 
   const reset = () => {
-    setSelectedType(null); setInputMode('upload'); setPreview(null); setFileName('');
+    setSelectedType(null); setInputMode('upload'); setPreview(null); setPreviewIsPdf(false); setFileName('');
     setStage('idle'); setError('');
     setAdnocForm(EMPTY_ADNOC); setShippingForm(EMPTY_SHIPPING); setGeneralForm(EMPTY_GENERAL);
     setShippingCharges(SHIPPING_CHARGES.map(label => ({ label, amount: '' })));
@@ -840,7 +845,7 @@ export default function UploadPage() {
   };
 
   const clearUpload = () => {
-    setPreview(null); setStage('idle'); setFileName(''); setError('');
+    setPreview(null); setPreviewIsPdf(false); setStage('idle'); setFileName(''); setError('');
     clearReview();
     if (selectedType?.slug === 'adnoc') setAdnocForm(EMPTY_ADNOC);
     else if (selectedType?.slug === 'shipping') {
@@ -955,7 +960,10 @@ export default function UploadPage() {
 
       <div className={`grid gap-5 ${twoUp ? 'grid-cols-1 lg:grid-cols-5' : 'grid-cols-1'}`}>
         {inputMode === 'upload' && (
-          <div className={twoUp ? 'lg:col-span-2' : ''}>
+          // Sticky once there is a document: a shipping form runs well past one
+          // screen, and a preview that scrolls away by the charge breakdown is
+          // no more use than the icon it replaced.
+          <div className={`${twoUp ? 'lg:col-span-2' : ''} ${preview ? 'lg:sticky lg:top-5 lg:self-start' : ''}`}>
             {!preview ? (
               <div
                 onClick={() => fileRef.current?.click()}
@@ -993,16 +1001,21 @@ export default function UploadPage() {
                   )}
                 </div>
 
-                {preview === 'pdf' ? (
-                  <div className="flex flex-col items-center justify-center py-12 bg-paper-50">
-                    <div className="w-14 h-14 border-2 border-ink-900 bg-white flex items-center justify-center mb-3">
-                      <FileText className="w-6 h-6 text-ink-900" strokeWidth={2} />
-                    </div>
-                    <p className="text-sm text-ink-500">{uploading ? 'Reading the document' : 'Document uploaded'}</p>
-                  </div>
+                {previewIsPdf ? (
+                  <iframe
+                    src={`${preview}#toolbar=0&navpanes=0&view=FitH`}
+                    title="Uploaded document"
+                    className="w-full h-[28rem] lg:h-[34rem] bg-paper-50 block"
+                  />
                 ) : (
-                  <img src={resolveAsset(preview)} alt="Uploaded receipt" className="w-full object-contain max-h-80 bg-paper-50" />
+                  <img src={resolveAsset(preview)} alt="Uploaded receipt"
+                    className="w-full object-contain max-h-[28rem] lg:max-h-[34rem] bg-paper-50" />
                 )}
+
+                <a href={preview} target="_blank" rel="noopener noreferrer"
+                  className="block border-t border-paper-300 px-3 py-1.5 text-xs text-blue-600 font-bold hover:bg-paper-100 transition-colors duration-[120ms]">
+                  Open full size
+                </a>
 
                 {uploading && (
                   <div className="border-t-2 border-ink-900">
