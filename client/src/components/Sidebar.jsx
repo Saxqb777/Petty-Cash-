@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Table2, Settings, PiggyBank, Users, LogOut, Layers, Building2, ShieldAlert, Menu, X } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Table2, Settings, PiggyBank, Users, LogOut, Layers, Building2, ShieldAlert, Menu, X, BookOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const ROLE_RANK = { member: 1, finance: 2, admin: 3, owner: 4 };
@@ -13,6 +13,8 @@ const nav = [
   { to: '/settings',     icon: Settings,        label: 'Settings' },
   { to: '/members',      icon: Users,           label: 'Members',      minRole: 'admin' },
   { to: '/type-builder', icon: Layers,          label: 'Expense Types', minRole: 'admin' },
+  // Everyone, and last: it is reference, not a place you work.
+  { to: '/guide',        icon: BookOpen,        label: 'How to use' },
 ];
 
 export default function Sidebar() {

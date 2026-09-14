@@ -15,6 +15,7 @@ import PendingPage from './pages/PendingPage';
 import MembersPage from './pages/MembersPage';
 import ExpenseTypeBuilderPage from './pages/ExpenseTypeBuilderPage';
 import PlatformPage from './pages/PlatformPage';
+import GuidePage from './pages/GuidePage';
 
 // 120ms ease-out, opacity and a 4px translate. No spring, no scale.
 const pageVariants = {
@@ -44,6 +45,7 @@ function AnimatedRoutes() {
         <Route path="/members"       element={<PageWrapper><MembersPage /></PageWrapper>} />
         <Route path="/type-builder"  element={<PageWrapper><ExpenseTypeBuilderPage /></PageWrapper>} />
         <Route path="/platform"      element={<PageWrapper><PlatformPage /></PageWrapper>} />
+        <Route path="/guide"         element={<PageWrapper><GuidePage /></PageWrapper>} />
       </Routes>
     </AnimatePresence>
   );
