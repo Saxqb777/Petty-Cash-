@@ -84,18 +84,31 @@ router.post('/signup', async (req, res) => {
         return { userId: user.id, orgId: org.id, status: 'active', role: 'owner' };
       }
 
-      // join — create a pending membership
+      // join — normally a pending membership, approved by an admin of that org
       if (!org_id) throw Object.assign(new Error('org_id is required when joining an org'), { status: 400 });
       const org = await tx.one('SELECT id FROM organizations WHERE id = $1', [Number(org_id) || 0]);
       if (!org) throw Object.assign(new Error('Organization not found'), { status: 404 });
 
+      // An organisation with nobody in it has nobody who can approve anyone, so
+      // a pending request there would wait forever. This happens to any org
+      // created by seeding rather than by a person signing up. The first person
+      // to join an empty one therefore becomes its owner and approves everyone
+      // after them. Once there is a single active member this branch never runs
+      // again, so approval still gates every populated organisation.
+      const populated = await tx.one(
+        `SELECT 1 AS x FROM memberships WHERE org_id = $1 AND status = 'active' LIMIT 1`,
+        [org.id]
+      );
+      const role   = populated ? 'member' : 'owner';
+      const status = populated ? 'pending' : 'active';
+
       await tx.query(
-        `INSERT INTO memberships (user_id, org_id, role, status) VALUES ($1, $2, 'member', 'pending')
+        `INSERT INTO memberships (user_id, org_id, role, status) VALUES ($1, $2, $3, $4)
          ON CONFLICT (user_id, org_id) DO NOTHING`,
-        [user.id, org.id]
+        [user.id, org.id, role, status]
       );
 
-      return { userId: user.id, orgId: org.id, status: 'pending', role: 'member' };
+      return { userId: user.id, orgId: org.id, status, role };
     });
 
     // Create session

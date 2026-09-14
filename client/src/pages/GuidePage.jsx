@@ -185,6 +185,11 @@ export default function GuidePage() {
               Leave it open. Nothing is wrong. Chase an administrator if it is still waiting the
               next day.
             </Note>
+            <Note>
+              One exception: an organisation with nobody in it yet has nobody who could approve
+              you, so the first person to join one becomes its owner and goes straight in. They
+              then approve everyone after them.
+            </Note>
           </Section>
 
           <Section {...SECTIONS[2]}>
