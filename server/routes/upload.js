@@ -81,8 +81,11 @@ router.post(
 
       // Tenant-scoped pathname so orgs can never collide on a filename.
       const ext = (path.extname(req.file.originalname || '') || '.bin').toLowerCase();
+      // Private: a receipt URL is not fetchable on its own. Reading one goes
+      // through GET /api/records/:id/receipt, which checks the session and the
+      // caller's organisation before issuing a short-lived signed link.
       const blob = await put(`org-${orgId}/${crypto.randomUUID()}${ext}`, buffer, {
-        access: 'public',
+        access: 'private',
         contentType: req.file.mimetype || undefined,
         addRandomSuffix: false,
       });
@@ -97,7 +100,9 @@ router.post(
       }
 
       res.json({
-        image_path: blob.url,
+        // The pathname, not the URL: a private blob has to be presigned to be
+        // read, and presigning takes a pathname.
+        image_path: blob.pathname,
         file_hash,
         duplicate: existingByHash
           ? {

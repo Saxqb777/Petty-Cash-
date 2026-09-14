@@ -1,7 +1,7 @@
 const express = require('express');
 const { sql, query, one, withTransaction, toId } = require('../db');
 const { convertToAed, addMoney } = require('../utils/money');
-const { dropReceipts } = require('../utils/blob');
+const { dropReceipts, presignReceipt } = require('../utils/blob');
 const { requireAuth, requireMinRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -176,6 +176,38 @@ router.get('/:id', async (req, res) => {
     res.json(parseRecord(record));
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// GET the receipt for a record.
+//
+// This is the only way to read a receipt. The store is private, so the stored
+// pathname is worthless on its own; a signed link is minted here only after
+// requireAuth has established a session and the row has been matched against
+// the caller's own org_id. The link expires in minutes, so a copied URL is not
+// a lasting credential, and the redirect is marked private so no shared cache
+// holds on to it.
+router.get('/:id/receipt', async (req, res) => {
+  try {
+    const id = toId(req.params.id);
+    if (!id) return res.status(404).json({ error: 'Record not found' });
+
+    const row = await one(
+      'SELECT image_path FROM expenses WHERE id = $1 AND org_id = $2',
+      [id, req.user.org_id]
+    );
+    // Same 404 whether the record belongs to another org or simply has no
+    // receipt: a caller should not learn which.
+    if (!row || !row.image_path) return res.status(404).json({ error: 'No receipt for this record' });
+
+    const url = await presignReceipt(row.image_path);
+    if (!url) return res.status(404).json({ error: 'No receipt for this record' });
+
+    res.set('Cache-Control', 'private, max-age=60');
+    res.redirect(302, url);
+  } catch (err) {
+    console.error('[receipt]', err.message);
+    res.status(500).json({ error: 'Could not open the receipt' });
   }
 });
 
