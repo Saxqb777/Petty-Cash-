@@ -8,6 +8,7 @@ import {
   FileSpreadsheet, Zap, Home, ShoppingBag, Truck
 } from 'lucide-react';
 import { api } from '../utils/api';
+import { isDemoHost, SAMPLE_DOCS } from '../lib/site';
 import { useToast } from '../components/Toast';
 
 const CURRENCIES = ['AED', 'USD', 'EUR', 'GBP', 'SAR', 'QAR', 'KWD', 'OMR'];
@@ -965,6 +966,7 @@ export default function UploadPage() {
           // no more use than the icon it replaced.
           <div className={`${twoUp ? 'lg:col-span-2' : ''} ${preview ? 'lg:sticky lg:top-5 lg:self-start' : ''}`}>
             {!preview ? (
+              <>
               <div
                 onClick={() => fileRef.current?.click()}
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -988,6 +990,25 @@ export default function UploadPage() {
                 <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden"
                   onChange={e => e.target.files[0] && handleFile(e.target.files[0])} />
               </div>
+              {isDemoHost() && (
+                // Demo: a visitor rarely has a bill to hand, so offer ours. It goes
+                // through the same real read as an upload.
+                <div className="mt-3 border-2 border-ink-900 bg-white px-3 py-3">
+                  <p className="label mb-2">No bill to hand? Read one of ours</p>
+                  <div className="flex flex-wrap gap-2">
+                    {SAMPLE_DOCS.map(d => (
+                      <button key={d.file} type="button" className="btn-quiet btn-sm"
+                        onClick={async () => {
+                          const blob = await fetch(`/samples/${d.file}.png`).then(r => r.blob());
+                          handleFile(new File([blob], `${d.file}.png`, { type: 'image/png' }));
+                        }}>
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              </>
             ) : (
               <div className="plate">
                 <div className="flex items-center gap-2 px-3 py-2 border-b-2 border-ink-900">

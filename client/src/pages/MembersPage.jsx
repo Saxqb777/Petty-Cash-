@@ -30,6 +30,7 @@ export default function MembersPage() {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirm, setConfirm] = useState(null);
+  const [joinCode, setJoinCode] = useState('');
 
   const load = () => {
     fetch('/api/members', { credentials: 'include' })
@@ -39,6 +40,12 @@ export default function MembersPage() {
   };
 
   useEffect(load, []);
+  useEffect(() => {
+    fetch('/api/members/join-code', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => d?.code && setJoinCode(d.code))
+      .catch(() => {});
+  }, []);
 
   const apiFetch = (path, method, body) =>
     fetch(path, { method, credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
@@ -87,6 +94,24 @@ export default function MembersPage() {
         <h1 className="text-3xl w-wider text-ink-900">Members</h1>
         <p className="text-sm text-ink-500 mt-1">{user?.org_name}</p>
       </div>
+
+      {/* Join code: how a colleague asks to join. There is no public list. */}
+      {joinCode && (
+        <section className="plate px-4 py-3 flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[12rem]">
+            <p className="label mb-1">Join code</p>
+            <p className="text-sm text-ink-500">Colleagues choose Join existing when they sign up and type this code. You approve them here.</p>
+          </div>
+          <span className="font-mono text-lg text-ink-900 tracking-wider">{joinCode}</span>
+          <button
+            type="button"
+            className="btn-ghost btn-sm"
+            onClick={() => navigator.clipboard?.writeText(joinCode).then(() => showToast('Join code copied', 'success'))}
+          >
+            Copy
+          </button>
+        </section>
+      )}
 
       {/* Pending requests */}
       {pending.length > 0 && (

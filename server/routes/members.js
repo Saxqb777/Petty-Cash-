@@ -1,9 +1,19 @@
 const express = require('express');
 const { sql, toId } = require('../db');
 const { requireAuth, requireMinRole } = require('../middleware/auth');
+const { joinCodeFor } = require('../utils/join-code');
 
 const router = express.Router();
 router.use(requireAuth);
+
+// GET /api/members/join-code — the code a new colleague types to ask to join
+router.get('/join-code', requireMinRole('admin'), (req, res) => {
+  try {
+    res.json({ code: joinCodeFor(req.user.org_id) });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
 
 // GET /api/members — list all members + pending requests for this org
 router.get('/', requireMinRole('admin'), async (req, res) => {

@@ -267,6 +267,41 @@ ${lines.join(',\n')}
 For any field you are uncertain about, add its key to the confidence object with value "low".`;
 }
 
+// ── Whose receipts are these? ─────────────────────────────────────────────
+// The prompts above were written for the first customer, Agthia Group, and
+// name its subsidiaries. Agthia (org 1) keeps them word for word. Every other
+// company gets its own name and its own business units in the same places, so
+// the model never files a stranger's receipt under Agthia.
+function isAgthia(org) {
+  return !org || Number(org.id) === 1 || org.slug === 'agthia';
+}
+
+function localizePrompt(prompt, org) {
+  if (isAgthia(org)) return prompt;
+  const name = String(org.name || 'the company').replace(/[`$]/g, '');
+  const units = (Array.isArray(org.units) ? org.units : [])
+    .map((u) => String(u).replace(/["`$]/g, '').trim())
+    .filter((u) => u && u.toLowerCase() !== 'other');
+  const unitList = units.map((u) => `"${u}"`).join(', ');
+  const unitEnum = units.length ? `${units.join(' or ')} or null` : 'null';
+  const detect = units.length
+    ? `If the document names one of these business units (${unitList}), set business_unit to it. Otherwise null.`
+    : 'Set business_unit to null.';
+  const swaps = [
+    ['You are an expert UAE petty cash accountant for Agthia Group, a UAE food & beverage company.', `You are an expert petty cash accountant for ${name}.`],
+    ['- Business units: AAFB (Agthia Flour & Bakery), Al Foah (dates/agriculture), GMFF, BMB', units.length ? `- Business units: ${units.join(', ')}` : '- Business units: none set'],
+    ['BUSINESS UNIT DETECTION: If the receipt mentions "Al Foah", "AAFB", "GMFF", "BMB", or Agthia subsidiary names — set business_unit. Otherwise null.', `BUSINESS UNIT DETECTION: ${detect}`],
+    ['You are an expert UAE freight & customs accountant for Agthia Group.', `You are an expert freight & customs accountant for ${name}.`],
+    ['If consignee/notify party contains "Al Foah", "AAFB", "GMFF", "BMB", or "Agthia" → set business_unit', `If consignee/notify party names one of this company's business units (${unitList || 'none set'}) → set business_unit`],
+    ['for Agthia Group.', `for ${name}.`],
+    ['BUSINESS UNIT: If the receipt mentions "Al Foah", "AAFB", "GMFF", "BMB" → set business_unit.', `BUSINESS UNIT: ${detect}`],
+    ['"AAFB or Al Foah or GMFF or BMB or null"', `"${unitEnum}"`],
+  ];
+  let out = prompt;
+  for (const [from, to] of swaps) out = out.split(from).join(to);
+  return out;
+}
+
 /**
  * Extract structured expense data from an uploaded receipt.
  *
@@ -276,8 +311,9 @@ For any field you are uncertain about, add its key to the confidence object with
  *
  * @param {Buffer} buffer       raw file bytes (multer memoryStorage)
  * @param {string} originalName original filename, used only to pick the media type
+ * @param {{id, name, slug, units}} org  the uploading company; see localizePrompt
  */
-async function parseReceiptBuffer(buffer, originalName = '', expenseType = 'general', customSchema = null, aiHints = null) {
+async function parseReceiptBuffer(buffer, originalName = '', expenseType = 'general', customSchema = null, aiHints = null, org = null) {
   if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
     throw new Error('No file data to extract from');
   }
@@ -291,6 +327,7 @@ async function parseReceiptBuffer(buffer, originalName = '', expenseType = 'gene
   else if (expenseType === 'shipping') prompt = buildShippingPrompt(today);
   else if (expenseType === 'adnoc') prompt = buildAdnocPrompt(today);
   else prompt = buildPrompt(today);
+  prompt = localizePrompt(prompt, org);
 
   // Put the bill (volatile, changes every request) in the user turn, and the
   // large static instructions in the system prompt so they form a cacheable
@@ -349,4 +386,4 @@ async function parseReceiptBuffer(buffer, originalName = '', expenseType = 'gene
   return parsed;
 }
 
-module.exports = { parseReceiptBuffer };
+module.exports = { parseReceiptBuffer, localizePrompt };

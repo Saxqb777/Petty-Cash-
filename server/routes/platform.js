@@ -3,6 +3,8 @@ const { sql, one, withTransaction, toId } = require('../db');
 const { dropReceipts } = require('../utils/blob');
 const { requireSuperadmin } = require('../middleware/auth');
 
+const { joinCodeFor } = require('../utils/join-code');
+
 const router = express.Router();
 router.use(requireSuperadmin);
 
@@ -42,7 +44,8 @@ router.get('/orgs', async (req, res) => {
         (SELECT MAX(created_at) FROM expenses e WHERE e.org_id = o.id)                           AS last_activity
       FROM organizations o
       ORDER BY o.created_at DESC`;
-    res.json(orgs);
+    // The platform owner can hand the first person their org's join code.
+    res.json(orgs.map((o) => ({ ...o, join_code: joinCodeFor(o.id) })));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
