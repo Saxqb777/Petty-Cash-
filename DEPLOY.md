@@ -126,3 +126,14 @@ git add package-lock.json && git commit -m "Restore lockfile"
 Railway still has the old app and its data. Keep it running until every check above passes. Nothing in this migration touches it.
 
 Once you are satisfied, tear Railway down — the volume is the only copy of the old expense data, so export anything you want to keep first. You have said you do not need it, so this is a note for the record rather than a step.
+
+---
+
+## 6. The public demo (demo.docledger.site)
+
+Same deployment, second database. Requests on a demo host (`DEMO_HOSTS`, default `demo.docledger.site` and `demo-preview.docledger.site`) read and write only `DEMO_DATABASE_URL`.
+
+1. Neon project `docledger-demo` (winter-unit-14988762, Frankfurt), database `demo`: apply `server/db/schema.sql`, then `server/db/demo-schema.sql`. Done 2026-09-30.
+2. `DEMO_DATABASE_URL` set for Production and Preview on this project. Done 2026-09-30.
+3. Domains on this project: `demo.docledger.site` (production) and `demo-preview.docledger.site` (branch previews). DNS at Spaceship: CNAME `demo` and `demo-preview` to `cname.vercel-dns.com`.
+4. `docledger.site` and `www` point at this project once the sales page is merged; the Tower keeps its own address.
