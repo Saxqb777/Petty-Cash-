@@ -200,6 +200,12 @@ router.get('/:id/receipt', async (req, res) => {
     // receipt: a caller should not learn which.
     if (!row || !row.image_path) return res.status(404).json({ error: 'No receipt for this record' });
 
+    // Demo sample companies point at the sample documents shipped with the app.
+    if (/^\/samples\/[a-z0-9-]+\.(png|jpg|webp|pdf)$/.test(row.image_path)) {
+      res.set('Cache-Control', 'private, max-age=60');
+      return res.redirect(302, row.image_path);
+    }
+
     const url = await presignReceipt(row.image_path);
     if (!url) return res.status(404).json({ error: 'No receipt for this record' });
 

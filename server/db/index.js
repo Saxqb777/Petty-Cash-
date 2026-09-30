@@ -15,6 +15,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const { neon, neonConfig, Pool, types } = require('@neondatabase/serverless');
+const { isDemo } = require('../demo/context');
 
 // ── Type parsers ───────────────────────────────────────────────────────────
 // Postgres int8 (BIGSERIAL ids, COUNT(*)) and numeric are returned as *strings*
@@ -35,11 +36,14 @@ if (typeof globalThis.WebSocket === 'undefined') {
   }
 }
 
-function connectionString() {
-  const url = (process.env.DATABASE_URL || '').trim();
+// Demo requests (see server/demo/context.js) read DEMO_DATABASE_URL and never
+// fall back to the real database.
+function connectionString(demo = isDemo()) {
+  const name = demo ? 'DEMO_DATABASE_URL' : 'DATABASE_URL';
+  const url = (process.env[name] || '').trim();
   if (!url) {
     const err = new Error(
-      'DATABASE_URL is not set. Add your Neon connection string to the environment ' +
+      `${name} is not set. Add the Neon connection string to the environment ` +
       '(Vercel → Project → Settings → Environment Variables, or .env locally).'
     );
     err.status = 500;
@@ -48,16 +52,20 @@ function connectionString() {
   return url;
 }
 
-let _sql = null;
+const _sql = { real: null, demo: null };
 function http() {
-  if (!_sql) _sql = neon(connectionString());
-  return _sql;
+  const demo = isDemo();
+  const key = demo ? 'demo' : 'real';
+  if (!_sql[key]) _sql[key] = neon(connectionString(demo));
+  return _sql[key];
 }
 
-let _pool = null;
+const _pool = { real: null, demo: null };
 function pool() {
-  if (!_pool) _pool = new Pool({ connectionString: connectionString() });
-  return _pool;
+  const demo = isDemo();
+  const key = demo ? 'demo' : 'real';
+  if (!_pool[key]) _pool[key] = new Pool({ connectionString: connectionString(demo) });
+  return _pool[key];
 }
 
 // ── Tagged template (preferred for static statements) ──────────────────────

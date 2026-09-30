@@ -16,6 +16,10 @@ import MembersPage from './pages/MembersPage';
 import ExpenseTypeBuilderPage from './pages/ExpenseTypeBuilderPage';
 import PlatformPage from './pages/PlatformPage';
 import GuidePage from './pages/GuidePage';
+import LandingPage from './pages/LandingPage';
+import DemoBoot from './components/DemoBoot';
+import DemoBanner from './components/DemoBanner';
+import { isDemoHost, SITE_URL } from './lib/site';
 
 // 120ms ease-out, opacity and a 4px translate. No spring, no scale.
 const pageVariants = {
@@ -67,6 +71,20 @@ function AppShell() {
     );
   }
 
+  const demo = isDemoHost();
+
+  // The sales page: always at /welcome, and at / for anyone signed out on the real site.
+  if (location.pathname === '/welcome' || (!demo && !user && location.pathname === '/')) {
+    return <LandingPage />;
+  }
+
+  // The demo signs a visitor straight into a sample company; accounts are made on the real site.
+  if (demo && ['/login', '/signup', '/pending'].includes(location.pathname)) {
+    window.location.replace(`${SITE_URL}${location.pathname === '/login' ? '/login' : '/signup'}`);
+    return null;
+  }
+  if (demo && !user) return <DemoBoot />;
+
   // Public routes — always accessible
   const publicPaths = ['/login', '/signup', '/pending'];
   if (publicPaths.includes(location.pathname)) {
@@ -95,6 +113,7 @@ function AppShell() {
     <div className="flex min-h-screen bg-paper-100">
       <Sidebar />
       <main className="flex-1 min-w-0 overflow-auto pt-14 lg:pt-0">
+        {demo && <DemoBanner />}
         <AnimatedRoutes />
       </main>
     </div>

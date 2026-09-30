@@ -44,11 +44,17 @@ const membersRouter      = require('./routes/members');
 const expenseTypesRouter = require('./routes/expense-types');
 const platformRouter     = require('./routes/platform');
 
+const { demoScope } = require('./demo/context');
+const demoRouter         = require('./routes/demo');
+
 const app = express();
 
 // Vercel terminates TLS and proxies to the function — trust one hop so
 // req.ip / req.protocol / secure cookies behave.
 app.set('trust proxy', 1);
+
+// ── Demo scope: requests on demo.docledger.site use the demo database ─────────
+app.use(demoScope);
 
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use(helmet({
@@ -78,6 +84,7 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 // the app).
 
 // ── API routes ────────────────────────────────────────────────────────────────
+app.use('/api/demo',          demoRouter);
 app.use('/api/auth',          authRouter);
 app.use('/api/members',       membersRouter);
 app.use('/api/expense-types', expenseTypesRouter);

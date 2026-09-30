@@ -6,6 +6,8 @@ const { put } = require('@vercel/blob');
 const { parseReceiptBuffer } = require('../utils/parser');
 const { one } = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { isDemo } = require('../demo/context');
+const { takeDemoRead } = require('../demo/limits');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -58,6 +60,13 @@ router.post(
       const orgId = req.user.org_id;
       const expenseType = req.body.expense_type || 'general';
 
+      // The demo reads real documents with the real model, so it is capped per
+      // sample company and per day. Checked before anything is stored or read.
+      if (isDemo()) {
+        const refusal = await takeDemoRead(orgId);
+        if (refusal) return res.status(429).json({ error: refusal });
+      }
+
       // Look up the custom type schema if this is a non-builtin type
       let customSchema = null;
       let customAiHints = null;
@@ -72,6 +81,15 @@ router.post(
         } catch (_) { /* fall back to the built-in prompt */ }
       }
 
+      // Who the reader is working for: the company's name and its own business
+      // units, taken from the type being read (see localizePrompt in parser.js).
+      let units = [];
+      try {
+        const schema = JSON.parse(typeRow?.fields_schema || '[]');
+        units = schema.find((f) => f.key === 'business_unit')?.options || [];
+      } catch (_) { units = []; }
+      const org = { id: orgId, name: req.user.org_name, slug: req.user.org_slug, units };
+
       // Content hash for duplicate detection (same bytes = same receipt)
       const file_hash = crypto.createHash('sha256').update(buffer).digest('hex');
       const existingByHash = await one(
@@ -84,7 +102,8 @@ router.post(
       // Private: a receipt URL is not fetchable on its own. Reading one goes
       // through GET /api/records/:id/receipt, which checks the session and the
       // caller's organisation before issuing a short-lived signed link.
-      const blob = await put(`org-${orgId}/${crypto.randomUUID()}${ext}`, buffer, {
+      const prefix = isDemo() ? 'demo/' : '';
+      const blob = await put(`${prefix}org-${orgId}/${crypto.randomUUID()}${ext}`, buffer, {
         access: 'private',
         contentType: req.file.mimetype || undefined,
         addRandomSuffix: false,
@@ -93,7 +112,7 @@ router.post(
       let parsed = { ...FALLBACK };
       let parseError = null;
       try {
-        parsed = await parseReceiptBuffer(buffer, req.file.originalname, expenseType, customSchema, customAiHints);
+        parsed = await parseReceiptBuffer(buffer, req.file.originalname, expenseType, customSchema, customAiHints, org);
       } catch (err) {
         console.warn('Claude parse failed:', err.message);
         parseError = err.message;

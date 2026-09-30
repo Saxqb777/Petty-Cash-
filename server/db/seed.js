@@ -20,7 +20,13 @@ const DEFAULT_EXCHANGE_RATES =
 // The platform owner. Promoted idempotently; a no-op until the account exists.
 const PLATFORM_OWNER_EMAIL = 'saaqibkhan58@gmail.com';
 
-const DEFAULT_EXPENSE_TYPES = [
+// Org 1 (Agthia Group) keeps its own business units. Every other company gets
+// neutral ones it can rename, so a new customer never sees another customer's
+// subsidiaries in a dropdown.
+const AGTHIA_BUSINESS_UNITS = ['AAFB', 'Al Foah', 'GMFF', 'BMB', 'Other'];
+const NEUTRAL_BUSINESS_UNITS = ['Head office', 'Branch', 'Warehouse', 'Other'];
+
+const expenseTypesFor = (units) => [
   {
     name: 'Petrol & Fuel', slug: 'adnoc', icon: 'fuel', color: '#f97316',
     description: 'Fuel station receipts and vehicle fuel expenses',
@@ -32,7 +38,7 @@ const DEFAULT_EXPENSE_TYPES = [
       { key: 'litres', label: 'Litres', type: 'number', custom: true },
       { key: 'odometer', label: 'Odometer', type: 'text', custom: true },
       { key: 'vehicle_plate', label: 'Vehicle Plate', type: 'text', custom: true },
-      { key: 'business_unit', label: 'Business Unit', type: 'select', options: ['AAFB', 'Al Foah', 'GMFF', 'BMB', 'Other'] },
+      { key: 'business_unit', label: 'Business Unit', type: 'select', options: units },
       { key: 'payment_method', label: 'Payment Method', type: 'select', options: ['Card', 'Cash'] },
       { key: 'purpose', label: 'Trip / Route', type: 'text' },
       { key: 'submitted_by', label: 'Submitted By', type: 'text' },
@@ -52,7 +58,7 @@ const DEFAULT_EXPENSE_TYPES = [
       { key: 'port', label: 'Port', type: 'select', options: ['AUH', 'DXB', 'AJM', 'SHJ'] },
       { key: 'shipment_type', label: 'Import / Export', type: 'select', options: ['Import', 'Export'] },
       { key: 'date', label: 'Date', type: 'date', required: true },
-      { key: 'business_unit', label: 'Business Unit', type: 'select', options: ['AAFB', 'Al Foah', 'GMFF', 'BMB', 'Other'] },
+      { key: 'business_unit', label: 'Business Unit', type: 'select', options: units },
       { key: 'line_items', label: 'Charges Breakdown', type: 'charges' },
       { key: 'notes', label: 'Notes', type: 'textarea' },
     ]),
@@ -68,7 +74,7 @@ const DEFAULT_EXPENSE_TYPES = [
       { key: 'amount', label: 'Amount', type: 'currency', required: true },
       { key: 'date', label: 'Date', type: 'date', required: true },
       { key: 'category', label: 'Category', type: 'select', required: true, options: ['Fuel & Transport', 'Parking', 'Customs & Clearance', 'Printing & Photocopy', 'Materials & Supplies', 'Food & Beverages', 'Office Supplies', 'Accommodation & Travel', 'Medical', 'Miscellaneous'] },
-      { key: 'business_unit', label: 'Business Unit', type: 'select', options: ['AAFB', 'Al Foah', 'GMFF', 'BMB', 'Other'] },
+      { key: 'business_unit', label: 'Business Unit', type: 'select', options: units },
       { key: 'payment_method', label: 'Payment Method', type: 'select', options: ['Cash', 'Card'] },
       { key: 'purpose', label: 'Purpose', type: 'text' },
       { key: 'submitted_by', label: 'Submitted By', type: 'text' },
@@ -79,13 +85,15 @@ const DEFAULT_EXPENSE_TYPES = [
   },
 ];
 
+const DEFAULT_EXPENSE_TYPES = expenseTypesFor(AGTHIA_BUSINESS_UNITS);
+
 // `exec` is either the module-level http driver or a transaction handle — both
 // expose the same query(text, params) → rows signature.
 const defaultExec = { query };
 
 /** Insert the three built-in expense types for an org. Idempotent. */
-async function seedExpenseTypesForOrg(orgId, exec = defaultExec) {
-  for (const t of DEFAULT_EXPENSE_TYPES) {
+async function seedExpenseTypesForOrg(orgId, exec = defaultExec, units = NEUTRAL_BUSINESS_UNITS) {
+  for (const t of expenseTypesFor(units)) {
     await exec.query(
       `INSERT INTO expense_types
          (org_id, name, slug, icon, color, description, fields_schema, ai_hints, is_builtin, sort_order)
@@ -97,13 +105,13 @@ async function seedExpenseTypesForOrg(orgId, exec = defaultExec) {
 }
 
 /** Default exchange rates + built-in expense types for a freshly created org. */
-async function seedOrgDefaults(orgId, exec = defaultExec) {
+async function seedOrgDefaults(orgId, exec = defaultExec, units = NEUTRAL_BUSINESS_UNITS) {
   await exec.query(
     `INSERT INTO settings (key, value, org_id) VALUES ('exchange_rates', $1, $2)
      ON CONFLICT (key, org_id) DO NOTHING`,
     [DEFAULT_EXCHANGE_RATES, orgId]
   );
-  await seedExpenseTypesForOrg(orgId, exec);
+  await seedExpenseTypesForOrg(orgId, exec, units);
 }
 
 /** Create the SEED_OWNER_EMAIL account (owner of org 1) if it does not exist. */
@@ -147,7 +155,7 @@ async function runSeed() {
                      GREATEST((SELECT COALESCE(MAX(id), 1) FROM organizations), 1))`
     );
 
-    await seedOrgDefaults(1, tx);
+    await seedOrgDefaults(1, tx, AGTHIA_BUSINESS_UNITS);
 
     // Promote the platform owner (no-op until that account signs up).
     await tx.query('UPDATE users SET is_superadmin = TRUE WHERE LOWER(email) = $1', [PLATFORM_OWNER_EMAIL]);
@@ -160,6 +168,9 @@ async function runSeed() {
 
 module.exports = {
   DEFAULT_EXPENSE_TYPES,
+  AGTHIA_BUSINESS_UNITS,
+  NEUTRAL_BUSINESS_UNITS,
+  expenseTypesFor,
   DEFAULT_EXCHANGE_RATES,
   seedExpenseTypesForOrg,
   seedOrgDefaults,

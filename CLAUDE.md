@@ -114,6 +114,22 @@ The full table lives at the top of `client/src/index.css`. The two that catch pe
 
 ---
 
+## Public site and demo (added 2026-09-30)
+
+- **docledger.site** shows the sales page (`client/src/pages/LandingPage.jsx`) to anyone signed out at `/`, and always at `/welcome`. Screens on it are real screenshots of the app in `client/public/landing/`.
+- **demo.docledger.site** is the same deployment. `server/demo/context.js` marks requests on a demo host and `server/db/index.js` then connects to `DEMO_DATABASE_URL` (Neon project `docledger-demo`, winter-unit-14988762), never to the real database. No fallback: a demo request without that variable fails.
+- A visitor gets a sample company of their own (`POST /api/demo/start`, `server/demo/sample.js`): three months of made up shipping bills, fuel and petty cash, signed straight in. `?for=<code>` comes from a Doc Ledger email; the company is named after the reader and gets one of their documents as a type (the preview is fetched from the Tower, `TOWER_URL/api/public/preview/<code>`).
+- Budget: 5 reads per sample company and 30 a day for the whole demo (`server/demo/limits.js`, counters in `demo_usage`). Sample companies are deleted after 3 days. Demo uploads go to Blob under `demo/`.
+- Demo database schema: `schema.sql`, then `server/db/demo-schema.sql`.
+
+## Join codes
+
+The public list of organisations is gone (`GET /api/auth/orgs` answers 410). Joining an existing organisation takes a join code an admin copies from the Members page (`server/utils/join-code.js`: org id plus an HMAC signature, no column needed). The platform owner sees every org's code.
+
+## Whose receipts
+
+`server/utils/parser.js` prompts were written for Agthia Group. `localizePrompt` keeps them word for word for org 1 and swaps in each other company's own name and business units. New organisations get neutral business units (Head office, Branch, Warehouse, Other); org 1 keeps AAFB, Al Foah, GMFF, BMB.
+
 ## Environment Variables
 
 | Variable | Required | Notes |
@@ -122,6 +138,11 @@ The full table lives at the top of `client/src/index.css`. The two that catch pe
 | `BLOB_READ_WRITE_TOKEN` | Yes | Vercel Blob store |
 | `ANTHROPIC_API_KEY` | Yes | Receipt extraction |
 | `SEED_OWNER_EMAIL` / `SEED_OWNER_PASSWORD` | No | Creates one owner for org 1 on seed |
+| `DEMO_DATABASE_URL` | For the demo | Neon connection string of the demo database. Demo hosts refuse to run without it |
+| `DEMO_HOSTS` | No | Comma list of demo hosts. Default `demo.docledger.site,demo-preview.docledger.site` |
+| `DEMO_READS_PER_COMPANY` / `DEMO_READS_PER_DAY` / `DEMO_COMPANIES_PER_DAY` | No | Demo budget, defaults 5 / 30 / 300 |
+| `TOWER_URL` | No | Where tailored previews come from. Default the Tower's production URL |
+| `JOIN_CODE_SECRET` | No | Signs join codes. Falls back to `DATABASE_URL`; setting it changes every code |
 
 ---
 

@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { sql, withTransaction, isUniqueViolation } = require('../db');
 const { seedOrgDefaults } = require('../db/seed');
 const { requireAuthAny } = require('../middleware/auth');
+const { orgIdFromJoinCode } = require('../utils/join-code');
 
 const router = express.Router();
 
@@ -37,10 +38,10 @@ async function uniqueSlug(tx, name) {
 }
 
 // ── POST /auth/signup ─────────────────────────────────────────────────────────
-// Body: { full_name, email, password, action: 'create'|'join', org_name?, org_id? }
+// Body: { full_name, email, password, action: 'create'|'join', org_name?, join_code? }
 router.post('/signup', async (req, res) => {
   try {
-    const { full_name, email, password, action, org_name, org_id } = req.body;
+    const { full_name, email, password, action, org_name, join_code } = req.body;
 
     if (!full_name?.trim() || !email?.trim() || !password) {
       return res.status(400).json({ error: 'full_name, email and password are required' });
@@ -85,9 +86,11 @@ router.post('/signup', async (req, res) => {
       }
 
       // join — normally a pending membership, approved by an admin of that org
-      if (!org_id) throw Object.assign(new Error('org_id is required when joining an org'), { status: 400 });
-      const org = await tx.one('SELECT id FROM organizations WHERE id = $1', [Number(org_id) || 0]);
-      if (!org) throw Object.assign(new Error('Organization not found'), { status: 404 });
+      // A join code from an admin of that org (utils/join-code.js), never a raw id.
+      const codeOrgId = orgIdFromJoinCode(join_code);
+      if (!codeOrgId) throw Object.assign(new Error('That join code is not valid. Ask an admin of your organization for it.'), { status: 400 });
+      const org = await tx.one('SELECT id FROM organizations WHERE id = $1', [codeOrgId]);
+      if (!org) throw Object.assign(new Error('That join code is not valid. Ask an admin of your organization for it.'), { status: 400 });
 
       // An organisation with nobody in it has nobody who can approve anyone, so
       // a pending request there would wait forever. This happens to any org
@@ -197,14 +200,10 @@ router.get('/me', requireAuthAny, async (req, res) => {
   }
 });
 
-// ── GET /auth/orgs — list orgs for the join dropdown ──────────────────────────
-router.get('/orgs', async (req, res) => {
-  try {
-    const orgs = await sql`SELECT id, name, slug FROM organizations ORDER BY name ASC`;
-    res.json(orgs);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// ── GET /auth/orgs ── retired ─────────────────────────────────────────────────
+// It listed every organisation's name to anyone. Joining now takes a join code.
+router.get('/orgs', (req, res) => {
+  res.status(410).json({ error: 'Ask an admin of your organization for its join code.' });
 });
 
 // ── POST /auth/cancel-request — pending user cancels their join request ───────

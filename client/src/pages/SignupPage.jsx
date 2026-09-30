@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
@@ -8,13 +8,8 @@ export default function SignupPage() {
   const { refreshUser } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [orgs, setOrgs] = useState([]);
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', action: 'create', org_name: '', org_id: '' });
+  const [form, setForm] = useState({ full_name: '', email: '', password: '', action: 'create', org_name: '', join_code: '' });
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/auth/orgs').then(r => r.json()).then(setOrgs).catch(() => {});
-  }, []);
 
   const nextStep = (e) => {
     e.preventDefault();
@@ -30,8 +25,8 @@ export default function SignupPage() {
     if (form.action === 'create' && !form.org_name.trim()) {
       showToast('Please enter an organization name', 'error'); return;
     }
-    if (form.action === 'join' && !form.org_id) {
-      showToast('Please select an organization to join', 'error'); return;
+    if (form.action === 'join' && !form.join_code.trim()) {
+      showToast('Please enter the join code from your admin', 'error'); return;
     }
     setLoading(true);
     try {
@@ -42,7 +37,7 @@ export default function SignupPage() {
           full_name: form.full_name, email: form.email, password: form.password,
           action: form.action,
           org_name: form.action === 'create' ? form.org_name : undefined,
-          org_id: form.action === 'join' ? parseInt(form.org_id) : undefined,
+          join_code: form.action === 'join' ? form.join_code.trim() : undefined,
         }),
       });
       const data = await r.json();
@@ -167,15 +162,12 @@ export default function SignupPage() {
                   </div>
                 ) : (
                   <div>
-                    <label className="label">Select organization</label>
-                    <select value={form.org_id}
-                      onChange={e => setForm(f => ({ ...f, org_id: e.target.value }))}
-                      className="select">
-                      <option value="">Choose…</option>
-                      {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                    </select>
+                    <label className="label">Join code</label>
+                    <input type="text" required value={form.join_code}
+                      onChange={e => setForm(f => ({ ...f, join_code: e.target.value }))}
+                      className="input font-mono uppercase" placeholder="12-ABCD2345" autoComplete="off" />
                     <p className="text-sm text-ink-500 mt-2">
-                      Your request needs admin approval before you can access the app.
+                      An admin of your organization finds the code on their Members page. Your request needs their approval before you can access the app.
                     </p>
                   </div>
                 )}
