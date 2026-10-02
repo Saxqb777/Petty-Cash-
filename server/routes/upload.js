@@ -117,6 +117,8 @@ router.post(
         console.warn('Claude parse failed:', err.message);
         parseError = err.message;
       }
+      // A visitor read one of their own documents in the demo made for them: the sales floor hears it.
+      if (isDemo() && !parseError) await require('./demo').reportDemoRead(orgId);
 
       res.json({
         // The pathname, not the URL: a private blob has to be presigned to be
