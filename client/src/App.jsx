@@ -19,6 +19,8 @@ import GuidePage from './pages/GuidePage';
 import LandingPage from './pages/LandingPage';
 import DemoBoot from './components/DemoBoot';
 import DemoBanner from './components/DemoBanner';
+import TrialBanner from './components/TrialBanner';
+import BillingPage from './pages/BillingPage';
 import { isDemoHost, SITE_URL } from './lib/site';
 
 // 120ms ease-out, opacity and a 4px translate. No spring, no scale.
@@ -50,6 +52,7 @@ function AnimatedRoutes() {
         <Route path="/type-builder"  element={<PageWrapper><ExpenseTypeBuilderPage /></PageWrapper>} />
         <Route path="/platform"      element={<PageWrapper><PlatformPage /></PageWrapper>} />
         <Route path="/guide"         element={<PageWrapper><GuidePage /></PageWrapper>} />
+        <Route path="/billing"       element={<PageWrapper><BillingPage /></PageWrapper>} />
       </Routes>
     </AnimatePresence>
   );
@@ -113,7 +116,7 @@ function AppShell() {
     <div className="flex min-h-screen bg-paper-100">
       <Sidebar />
       <main className="flex-1 min-w-0 overflow-auto pt-14 lg:pt-0">
-        {demo && <DemoBanner />}
+        {demo ? <DemoBanner /> : <TrialBanner />}
         <AnimatedRoutes />
       </main>
     </div>

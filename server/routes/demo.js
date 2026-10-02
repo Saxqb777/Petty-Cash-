@@ -32,7 +32,7 @@ const COOKIE_OPTS = {
   path: '/',
 };
 
-const TOWER_URL = (process.env.TOWER_URL || 'https://the-tower-saxqb777s-projects.vercel.app').replace(/\/$/, '');
+const { TOWER_URL, towerNotify } = require('../tower');
 const DEFAULT_COMPANY = 'Harbour Line Trading LLC';
 
 router.use((req, res, next) => (isDemo() ? next() : res.status(404).json({ error: 'Not found' })));
@@ -63,21 +63,19 @@ async function previewFor(code, agent) {
 // A document read inside a company's demo is the warmest signal the sales floor
 // gets before a reply: the Tower hears about it, signed with DEMO_EVENT_KEY.
 // Never blocks the upload and never throws.
-async function reportDemoRead(orgId) {
-  if (!process.env.DEMO_EVENT_KEY) return;
+async function demoCode(orgId) {
   try {
     const row = await one("SELECT value FROM settings WHERE key = 'demo_for' AND org_id = $1", [orgId]);
     const code = row && row.value;
-    if (!code || !/^[a-z0-9]{4,12}$/.test(code)) return;
-    await fetch(`${TOWER_URL}/api/public/preview/${code}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-tower-key': process.env.DEMO_EVENT_KEY },
-      body: JSON.stringify({ kind: 'read' }),
-      signal: AbortSignal.timeout(5000),
-    });
-  } catch (err) {
-    console.warn('[demo read report]', err.message);
+    return code && /^[a-z0-9]{4,12}$/.test(code) ? code : null;
+  } catch (_) {
+    return null;
   }
+}
+
+async function reportDemoRead(orgId) {
+  const code = await demoCode(orgId);
+  if (code) await towerNotify(code, { kind: 'read' });
 }
 
 // ── POST /api/demo/start ──────────────────────────────────────────────────────
@@ -125,7 +123,8 @@ router.post('/start', async (req, res) => {
 // ── GET /api/demo/status ── for the banner ─────────────────────────────────────
 router.get('/status', requireAuth, async (req, res) => {
   try {
-    res.json({ demo: true, company: req.user.org_name, readsLeft: await readsLeft(req.user.org_id) });
+    // the sales code travels to the signup, so the real company is tied to the lead that brought it (D080)
+    res.json({ demo: true, company: req.user.org_name, readsLeft: await readsLeft(req.user.org_id), code: await demoCode(req.user.org_id) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

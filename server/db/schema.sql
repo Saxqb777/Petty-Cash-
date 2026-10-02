@@ -161,3 +161,16 @@ CREATE INDEX IF NOT EXISTS idx_sessions_expires       ON sessions (expires_at);
 CREATE INDEX IF NOT EXISTS idx_memberships_user       ON memberships (user_id);
 CREATE INDEX IF NOT EXISTS idx_memberships_org        ON memberships (org_id);
 CREATE INDEX IF NOT EXISTS idx_expense_types_org      ON expense_types (org_id);
+
+-- ── Billing (D080) ──────────────────────────────────────────────────────────
+-- Every new organisation starts a free month. plan: free (made before billing
+-- existed, never gated), trial, active, past_due, cancelled. tower_code is the
+-- Doc Ledger sales code (?for=) that brought them, so the sales floor can
+-- follow the company through its month.
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'free';
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS tower_code TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS billing_email TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS paddle_customer_id TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS paddle_subscription_id TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS plan_updated_at TIMESTAMPTZ;

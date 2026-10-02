@@ -8,6 +8,7 @@ const { one } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { isDemo } = require('../demo/context');
 const { takeDemoRead } = require('../demo/limits');
+const { billingState } = require('../billing/paddle');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -65,6 +66,11 @@ router.post(
       if (isDemo()) {
         const refusal = await takeDemoRead(orgId);
         if (refusal) return res.status(429).json({ error: refusal });
+      } else {
+        // D080: a free month that ended, or a cancelled plan, stops new reads until a card is added.
+        const planRow = await one('SELECT plan, trial_ends_at FROM organizations WHERE id = $1', [orgId]);
+        const state = planRow ? billingState(planRow) : null;
+        if (state && state.blocked) return res.status(402).json({ error: state.reason, billing: true });
       }
 
       // Look up the custom type schema if this is a non-builtin type

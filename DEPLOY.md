@@ -137,3 +137,26 @@ Same deployment, second database. Requests on a demo host (`DEMO_HOSTS`, default
 2. `DEMO_DATABASE_URL` set for Production and Preview on this project. Done 2026-09-30.
 3. Domains on this project: `demo.docledger.site` (production) and `demo-preview.docledger.site` (branch previews). DNS at Spaceship: CNAME `demo` and `demo-preview` to `cname.vercel-dns.com`.
 4. `docledger.site` and `www` point at this project once the sales page is merged; the Tower keeps its own address.
+
+## Billing (D080)
+
+Paddle is the merchant of record: VAT, invoices and cards are theirs. The app needs four variables on the
+Vercel project (Settings, Environment Variables, Production and Preview):
+
+- `PADDLE_ENV`: `sandbox` while testing, `production` when live.
+- `PADDLE_CLIENT_TOKEN`: Paddle, Developer tools, Authentication, Client side token.
+- `PADDLE_PRICE_ID`: the monthly price of the Doc Ledger product (`pri_...`), Paddle, Catalog, Products.
+- `PADDLE_WEBHOOK_SECRET`: Paddle, Developer tools, Notifications, add a destination with the URL
+  `https://docledger.site/api/billing/paddle` and the events `subscription.activated`, `subscription.updated`,
+  `subscription.canceled`, `subscription.past_due`, `transaction.completed`; copy its secret key (`pdl_ntfset_...`).
+
+Without them the Billing page says card payments open soon and nobody is ever blocked. With them: every new
+organisation starts a 30 day free month (`organizations.plan = trial`, `trial_ends_at`), the Billing page opens the
+Paddle checkout, the webhook moves the plan to `active`, `past_due` or `cancelled`, and reads stop once a free
+month has ended without a card. Organisations made before billing existed stay on `plan = free` and are never gated.
+
+The sales floor (The Tower) is told through `DEMO_EVENT_KEY` (already set) when a company it brought signs up,
+pays or cancels, and may read usage for those companies at `GET /api/tower/usage?codes=...` with the same key.
+
+Schema: the `ALTER TABLE organizations ADD COLUMN IF NOT EXISTS ...` lines at the end of `server/db/schema.sql`
+(applied to the production and demo databases on 2026-10-02).

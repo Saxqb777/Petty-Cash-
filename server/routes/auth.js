@@ -3,6 +3,8 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { sql, withTransaction, isUniqueViolation } = require('../db');
 const { seedOrgDefaults } = require('../db/seed');
+const { trialEnd } = require('../billing/paddle');
+const { towerNotify } = require('../tower');
 const { requireAuthAny } = require('../middleware/auth');
 const { orgIdFromJoinCode } = require('../utils/join-code');
 
@@ -42,6 +44,8 @@ async function uniqueSlug(tx, name) {
 router.post('/signup', async (req, res) => {
   try {
     const { full_name, email, password, action, org_name, join_code } = req.body;
+    // D080: the Doc Ledger sales code (?for=) that brought them, so the sales floor follows the free month
+    const forCode = /^[a-z0-9]{4,12}$/.test(String(req.body.for_code || '')) ? String(req.body.for_code) : null;
 
     if (!full_name?.trim() || !email?.trim() || !password) {
       return res.status(400).json({ error: 'full_name, email and password are required' });
@@ -69,9 +73,10 @@ router.post('/signup', async (req, res) => {
         if (!org_name?.trim()) throw Object.assign(new Error('org_name is required when creating an org'), { status: 400 });
 
         const slug = await uniqueSlug(tx, org_name);
+        // Every new organisation starts a free month (D080).
         const org = await tx.one(
-          'INSERT INTO organizations (name, slug) VALUES ($1, $2) RETURNING id',
-          [org_name.trim().slice(0, 100), slug]
+          'INSERT INTO organizations (name, slug, plan, trial_ends_at, tower_code, billing_email) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+          [org_name.trim().slice(0, 100), slug, 'trial', trialEnd(), forCode, normalEmail]
         );
 
         // Default exchange rates + built-in expense types for the new org.
@@ -113,6 +118,11 @@ router.post('/signup', async (req, res) => {
 
       return { userId: user.id, orgId: org.id, status, role };
     });
+
+    // D080: the sales floor hears that a company it brought started its free month. Never blocks the signup.
+    if (action === 'create' && forCode) {
+      towerNotify(forCode, { kind: 'signup', orgId: String(orgId), company: org_name.trim().slice(0, 100), email: normalEmail, name: full_name.trim().slice(0, 100) }).catch(() => {});
+    }
 
     // Create session
     const token = generateToken();
