@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 
@@ -7,6 +7,9 @@ export default function SignupPage() {
   const { showToast } = useToast();
   const { refreshUser } = useAuth();
   const navigate = useNavigate();
+  // ?for=<code>: the Doc Ledger sales code from the demo or an email, so the company stays tied to its lead (D080)
+  const [params] = useSearchParams();
+  const forCode = /^[a-z0-9]{4,12}$/.test(params.get('for') || '') ? params.get('for') : undefined;
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({ full_name: '', email: '', password: '', action: 'create', org_name: '', join_code: '' });
   const [loading, setLoading] = useState(false);
@@ -38,6 +41,7 @@ export default function SignupPage() {
           action: form.action,
           org_name: form.action === 'create' ? form.org_name : undefined,
           join_code: form.action === 'join' ? form.join_code.trim() : undefined,
+          for_code: form.action === 'create' ? forCode : undefined,
         }),
       });
       const data = await r.json();

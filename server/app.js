@@ -46,6 +46,8 @@ const platformRouter     = require('./routes/platform');
 
 const { demoScope } = require('./demo/context');
 const demoRouter         = require('./routes/demo');
+const billingRouter      = require('./routes/billing');
+const towerRouter        = require('./routes/tower');
 
 const app = express();
 
@@ -71,6 +73,9 @@ app.use(cors({ origin: true, credentials: true }));
 // ── Cookie parser ─────────────────────────────────────────────────────────────
 app.use(cookieParser());
 
+// ── Paddle webhook (D080): needs the exact bytes for its signature, so it reads the raw body before the JSON parser
+app.post('/api/billing/paddle', express.raw({ type: '*/*', limit: '1mb' }), billingRouter.paddleWebhook);
+
 // ── Body limits ───────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
@@ -94,6 +99,8 @@ app.use('/api/upload',        uploadRouter);
 app.use('/api/export',        exportRouter);
 app.use('/api/settings',      settingsRouter);
 app.use('/api/savings',       savingsRouter);
+app.use('/api/billing',       billingRouter);
+app.use('/api/tower',         towerRouter);
 
 app.get('/api/health', (req, res) => {
   const missing = missingEnv();

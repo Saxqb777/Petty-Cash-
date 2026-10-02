@@ -23,7 +23,7 @@ export default function DemoBanner() {
         {status?.company ? `${status.company}: a sample company with made up paperwork.` : 'A sample company with made up paperwork.'}
         {typeof status?.readsLeft === 'number' ? ` Read ${status.readsLeft} more document${status.readsLeft === 1 ? '' : 's'} of your own on Upload.` : ''}
       </p>
-      <a href={`${SITE_URL}/signup`} className="btn-flare btn-sm">Start your free month</a>
+      <a href={`${SITE_URL}/signup${status?.code ? `?for=${status.code}` : ''}`} className="btn-flare btn-sm">Start your free month</a>
     </div>
   );
 }

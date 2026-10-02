@@ -1,5 +1,61 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BOOKING_URL, CONTACT_EMAIL, DEMO_URL } from '../lib/site';
+import { BOOKING_URL, CONTACT_EMAIL, DEMO_URL, TOWER_URL } from '../lib/site';
+
+// A recording link becomes an embed: YouTube (watch, youtu.be, shorts) or Loom. Anything else is a plain link.
+function embedFor(url) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, '');
+    if (host === 'youtu.be') return `https://www.youtube.com/embed/${u.pathname.slice(1)}`;
+    if (host === 'youtube.com' || host === 'm.youtube.com') {
+      const id = u.searchParams.get('v') || u.pathname.split('/').filter(Boolean).pop();
+      return id ? `https://www.youtube.com/embed/${id}` : null;
+    }
+    if (host === 'loom.com') return url.replace('/share/', '/embed/');
+  } catch (_) {
+    return null;
+  }
+  return null;
+}
+
+// Proof (D081): what a real customer said and one minute of the product, both pasted by the founder in The Tower.
+function Proof() {
+  const [proof, setProof] = useState(null);
+  useEffect(() => {
+    fetch(`${TOWER_URL}/api/public/proof`, { signal: AbortSignal.timeout(6000) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setProof)
+      .catch(() => {});
+  }, []);
+  if (!proof || (!proof.quote && !proof.video)) return null;
+  const embed = proof.video ? embedFor(proof.video) : null;
+  return (
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 lg:py-20 grid lg:grid-cols-12 gap-10 items-center">
+      {proof.quote ? (
+        <div className={proof.video ? 'lg:col-span-5' : 'lg:col-span-8'}>
+          <p className="label">From a finance team that uses it</p>
+          <blockquote className="mt-4">
+            <p className="display text-2xl sm:text-3xl text-ink-900 leading-snug">“{proof.quote.text}”</p>
+            {proof.quote.by ? <footer className="meta mt-4">{proof.quote.by}</footer> : null}
+          </blockquote>
+        </div>
+      ) : null}
+      {proof.video ? (
+        <div className={proof.quote ? 'lg:col-span-7' : 'lg:col-span-12'}>
+          <p className="label mb-3">One minute, one real bill</p>
+          {embed ? (
+            <div className="relative border-2 border-ink-900 bg-ink-900" style={{ aspectRatio: '16 / 9' }}>
+              <iframe title="Doc Ledger in one minute" src={embed} className="absolute inset-0 w-full h-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
+            </div>
+          ) : (
+            <a href={proof.video} className="btn-ghost" target="_blank" rel="noreferrer">Watch the recording</a>
+          )}
+        </div>
+      ) : null}
+    </section>
+  );
+}
 
 // docledger.site for anyone signed out. Built from the app's own Overprint
 // plates and real screens of the product, so the page looks like the thing it
@@ -112,7 +168,7 @@ export default function LandingPage() {
             <a href={DEMO_URL} className="btn-primary">Try the demo</a>
             <Link to="/signup" className="btn-ghost">Start your free month</Link>
           </div>
-          <p className="meta mt-3">The demo needs no signup. A sample company opens in a few seconds.</p>
+          <p className="meta mt-3">The demo needs no signup. The first month is free, no card to start.</p>
         </div>
         <div className="lg:col-span-7">
           <div className="relative mr-3 mb-3 sm:mr-5 sm:mb-5">
@@ -188,6 +244,8 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      <Proof />
 
       {/* ── Month end ────────────────────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 lg:py-20 grid lg:grid-cols-12 gap-10 items-center">
