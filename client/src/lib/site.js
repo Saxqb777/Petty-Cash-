@@ -5,6 +5,8 @@ export const SITE_URL = 'https://docledger.site';
 export const DEMO_URL = 'https://demo.docledger.site';
 export const BOOKING_URL = 'https://cal.com/saaqib-khan-fai1vo/15min';
 export const CONTACT_EMAIL = 'saaqib@docledger.site';
+// The sales floor (The Tower) serves the proof the site shows: a customer's words and a short recording (D081).
+export const TOWER_URL = 'https://the-tower-saxqb777s-projects.vercel.app';
 
 export function isDemoHost() {
   if (typeof window === 'undefined') return false;
