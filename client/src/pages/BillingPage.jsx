@@ -164,7 +164,7 @@ export default function BillingPage() {
           </div>
           <form onSubmit={saveEmail} className="flex flex-col sm:flex-row gap-2">
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="input flex-1" placeholder="accounts@yourcompany.com" />
-            <button type="submit" className="btn">Save</button>
+            <button type="submit" className="btn-ghost">Save</button>
           </form>
         </section>
       ) : null}
